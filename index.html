@@ -87,7 +87,8 @@ button.off{opacity:.55;text-decoration:line-through}
 .netnote{font-size:12px;color:var(--dim);background:rgba(255,194,61,.07);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:8px}
 #netBadge{font-size:11px;margin-top:4px}
 .pl .gold{font-size:11px;color:var(--gold);font-weight:700;white-space:nowrap}
-.seg{display:flex;gap:6px}.seg button{flex:1;padding:8px 4px}.seg button.on{background:#5a4024;border-color:var(--gold);color:var(--gold)}
+.seg{display:flex;gap:6px}.seg-n{gap:4px}.seg-n button{padding:8px 0;min-width:0}
+.members{max-height:34vh;overflow:auto}.seg button{flex:1;padding:8px 4px}.seg button.on{background:#5a4024;border-color:var(--gold);color:var(--gold)}
 table.score{width:100%;border-collapse:collapse;margin-top:6px;font-size:14px}
 table.score th{font-size:11px;color:var(--dim);font-weight:400;text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
 table.score td{padding:6px;border-bottom:1px solid rgba(255,200,120,.08);text-align:left}
@@ -130,7 +131,9 @@ button{touch-action:manipulation}
 @media (max-width:760px){
   #top{left:calc(6px + env(safe-area-inset-left));right:calc(6px + env(safe-area-inset-right));top:calc(6px + env(safe-area-inset-top));width:auto;gap:5px}
   #info{top:calc(54px + env(safe-area-inset-top));right:calc(6px + env(safe-area-inset-right))}
-  #players{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:4px}
+  #players{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:4px;max-height:30vh;overflow:auto}
+  #role{display:none!important}
+  #players.many .pl{padding:2px 6px}#players.many .pl .cnt,#players.many .pl .tag{display:none}
   #players:empty{display:none}
   .pl{padding:5px 7px;gap:5px;min-width:0}
   .pl .nm{font-size:12px}.pl .cnt{font-size:10px}.pl .tools{min-width:0;font-size:12px}.pl .okt{display:none}
@@ -198,14 +201,20 @@ button{touch-action:manipulation}
 <!-- LOBBY -->
 <div id="mLobby" class="modal hide"><div class="mbox panel">
   <h2>⛏ 深坑淘金 Deep Vein</h2>
-  <p class="dim" style="margin:0">4 名礦工、3 張終點卡，只有一張底下是金脈。你們之中可能藏著搗蛋鬼。</p>
+  <p class="dim" style="margin:0">3～10 名礦工、3 張終點卡，只有一張底下是金脈。你們之中藏著搗蛋鬼。</p>
   <div class="field"><label>你的暱稱</label><input id="iName" maxlength="10" placeholder="例如：Jerry"></div>
   <div class="field"><label>局數（每局結束依抽金塊規則分金，最後比總金塊數）</label>
     <div class="seg" id="segRounds"><button data-r="1">1 局</button><button data-r="3" class="on">3 局（標準）</button><button data-r="5">5 局</button></div></div>
+  <div class="field"><label>人數（不足的座位由 AI 補上）</label>
+    <div class="seg seg-n" id="segN"><button data-n="3">3</button><button data-n="4" class="on">4</button><button data-n="5">5</button><button data-n="6">6</button><button data-n="7">7</button><button data-n="8">8</button><button data-n="9">9</button><button data-n="10">10</button></div>
+    <div class="dim" id="nDesc" style="margin-top:4px"></div></div>
+  <div class="field"><label>難度</label>
+    <div class="seg" id="segDiff"><button data-d="easy">簡單</button><button data-d="std" class="on">標準</button><button data-d="hard">困難</button></div>
+    <div class="dim" id="diffDesc" style="margin-top:4px"></div></div>
   <div class="tabs"><button data-tab="solo" class="on">單人 vs AI</button><button data-tab="host">建立房間</button><button data-tab="join">加入房間</button></div>
 
   <div data-pane="solo">
-    <p class="dim">和 3 個 AI 礦工對戰，馬上開始。</p>
+    <p class="dim" id="soloDesc">和 3 個 AI 礦工對戰，馬上開始。</p>
     <button class="primary" id="bSolo" style="width:100%">開始遊戲</button>
   </div>
 
@@ -279,6 +288,8 @@ button{touch-action:manipulation}
     <li><b>地圖卡</b> 🗺：偷看一張終點卡，只有你知道結果。</li>
     <li>通道接上終點卡就翻開；翻到金脈，淘金者立即獲勝。</li>
     <li><b>計分（抽金塊）</b>：金塊卡共 28 張（1 塊×16、2 塊×8、3 塊×4）。淘金者獲勝時抽出與玩家人數相同的金塊卡，由挖到金脈的人先挑，再依出牌順序輪流分給其他淘金者（搗蛋鬼沒有）。搗蛋鬼獲勝時，1 名搗蛋鬼得 4 塊金。</li>
+    <li><b>人數</b>：3～10 人，照原版比例：3 人 1 搗蛋鬼＋3 淘金者、4 人 1＋4、5 人 2＋4、6 人 2＋5、7 人 3＋5、8 人 3＋6、9 人 3＋7、10 人 4＋7（都多 1 張不發）；手牌 3–5 人 6 張、6–7 人 5 張、8–10 人 4 張。搗蛋鬼獲勝時：1 人得 4 塊、2–3 人各得 3 塊、4 人以上各得 2 塊。</li>
+    <li><b>難度</b>：簡單＝原版身分比例（7 人以上少 1 張搗蛋鬼）；標準＝至少 1 名搗蛋鬼（4 人局身分卡 2 搗蛋鬼＋4 淘金者，可能出現 2 名搗蛋鬼）、十字通道少 1 張、死路多 2 張，AI 搗蛋鬼會先看地圖再把大家帶往煤礦；困難＝6 人以下再多 1 張搗蛋鬼身分卡、十字與 T 字通道變少、死路與落石變多。</li>
     <li><b>局數</b>：開局時選 1／3／5 局，每局重新抽身分；全部打完後，<b>金塊總數最多的人獲勝</b>。</li>
   </ol>
   <p class="dim">操作：拖曳旋轉視角、滾輪／雙指縮放、右鍵平移。選通道卡後，綠框是可放的位置，按 R 或「旋轉」換方向。</p>
@@ -295,7 +306,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const VERSION='dv-2';
+const VERSION='dv-3';
 const $=id=>document.getElementById(id);
 const QS=new URLSearchParams(location.search);
 
@@ -316,15 +327,30 @@ const rotEdges=(e,r)=>r?[e[2],e[3],e[0],e[1]]:e.slice();
 const inB=(x,y)=>x>=BOUNDS.x0&&x<=BOUNDS.x1&&y>=BOUNDS.y0&&y<=BOUNDS.y1;
 const isBroken=b=>b.pick||b.lamp||b.cart;
 
-function buildDeck(){
+// players → [saboteur cards, gold-digger cards] in the role pool (one card is left over), and hand size
+const ROLE_TABLE={3:[1,3],4:[1,4],5:[2,4],6:[2,5],7:[3,5],8:[3,6],9:[3,7],10:[4,7]};
+const HAND_SIZE=n=>n<=5?6:n<=7?5:4;
+const SAB_PAY=k=>k<=1?4:k<=3?3:2;
+function rolePool(n,diff){const [sb,dg]=ROLE_TABLE[n];
+  // balance tweaks measured with AI-vs-AI simulations:
+  //  standard 4p: extra saboteur + extra digger card (2 sabs ~1/3 of the time); hard ≤6p: one extra saboteur card;
+  //  easy ≥7p: one saboteur card fewer (big tables otherwise favour the saboteurs)
+  const xs=(diff==='hard'&&n<=6)||(diff==='std'&&n===4)?1:(diff==='easy'&&n>=7?-1:0),xd=diff==='std'&&n===4?1:0;
+  return [...Array(sb+xs).fill('S'),...Array(dg+xd).fill('D')]}
+const DIFFS={
+  easy:{name:'簡單',desc:'原版身分卡比例（7 人以上少 1 張搗蛋鬼），人少時可能沒有搗蛋鬼；AI 搗蛋鬼比較直接',deck:0,ai:0,atLeastOne:false},
+  std: {name:'標準',desc:'至少 1 名搗蛋鬼（4 人局多放 1 張搗蛋鬼和 1 張淘金者，可能有 2 名搗蛋鬼）；十字通道少 1 張、死路多 2 張；AI 搗蛋鬼會隱藏身分、偷看地圖後把大家帶往煤礦',deck:1,ai:2,atLeastOne:true},
+  hard:{name:'困難',desc:'6 人以下多 1 張搗蛋鬼身分卡、十字與 T 字通道變少、死路與落石變多，AI 搗蛋鬼全力阻撓',deck:2,ai:2,atLeastOne:true}};
+function buildDeck(lvl=0){const hard=lvl===2;
   const d=[];let id=0;
   const P=(n,e,s,w,conn,c)=>{for(let i=0;i<c;i++)d.push({id:id++,type:'path',edges:[!!n,!!e,!!s,!!w],conn:!!conn})};
-  P(1,0,1,0,1,4);P(0,1,0,1,1,3);P(1,1,0,0,1,5);P(1,0,0,1,1,4);P(1,1,1,0,1,5);P(1,1,0,1,1,5);P(1,1,1,1,1,5);
+  P(1,0,1,0,1,4);P(0,1,0,1,1,3);P(1,1,0,0,1,5);P(1,0,0,1,1,4);P(1,1,1,0,1,hard||lvl===3?4:5);P(1,1,0,1,1,hard?4:5);P(1,1,1,1,1,[5,4,3,4][lvl]);
   [[1,0,0,0],[0,1,0,0],[1,0,1,0],[0,1,0,1],[1,1,0,0],[1,0,0,1],[1,1,0,1],[1,1,1,0],[1,1,1,1]].forEach(e=>P(...e,0,1));
+  [[],[[1,1,1,1],[1,0,1,0]],[[1,0,1,0],[0,1,0,1],[1,1,1,1],[1,1,0,1]],[[1,0,1,0],[0,1,0,1],[1,1,1,1]]][lvl].forEach(e=>P(...e,0,1)); // extra dead ends
   for(const t of ['pick','lamp','cart'])for(let i=0;i<3;i++)d.push({id:id++,type:'break',tool:t});
   for(const t of ['pick','lamp','cart'])for(let i=0;i<2;i++)d.push({id:id++,type:'fix',tools:[t]});
   [['pick','lamp'],['pick','cart'],['lamp','cart']].forEach(ts=>d.push({id:id++,type:'fix',tools:ts}));
-  for(let i=0;i<3;i++)d.push({id:id++,type:'rockfall'});
+  for(let i=0;i<(hard?4:3);i++)d.push({id:id++,type:'rockfall'});
   for(let i=0;i<6;i++)d.push({id:id++,type:'map'});
   return shuffle(d);
 }
@@ -374,29 +400,29 @@ function frontierDistOf(board,targets,R=reachOf(board)){
 /* =========================================================
    ENGINE — runs on the host (or locally in solo mode)
    ========================================================= */
-const AINAMES=['阿岩','老鐵','小煤','石頭','老金'];
+const AINAMES=['阿岩','老鐵','小煤','石頭','老金','阿銅','小銀','大錘','燈哥','鐵蛋','礦妹'];
 const wait=ms=>new Promise(r=>setTimeout(r,FAST.test?0:ms*(FAST.on?.3:1)));
 class Engine{
-  constructor(seats,localPid,rounds=3){this.seats=seats;this.localPid=localPid;this.rounds=rounds;this.round=0;this.gold=[0,0,0,0];
-    this.goldDeck=newGoldDeck();this.startTurn=Math.floor(Math.random()*4);this.reset()}
+  constructor(seats,localPid,rounds=3,diff='std'){this.seats=seats;this.localPid=localPid;this.rounds=rounds;this.diff=DIFFS[diff]?diff:'std';this.round=0;this.n=seats.length;this.gold=Array(this.n).fill(0);
+    this.goldDeck=newGoldDeck();this.startTurn=Math.floor(Math.random()*this.n);this.reset()}
   nextRound(){this.reset();this.running=false;this.stopped=false}
   reset(){
     this.round++;
-    this.board=new Map();this.deck=buildDeck();this.pos=['0,0','0,0','0,0','0,0'];this.over=false;this.winner=null;this.awaiting=-1;this.goldCell=null;this.finder=-1;
+    this.board=new Map();this.deck=buildDeck(this.diff==='hard'&&this.n>=7?3:DIFFS[this.diff].deck);this.prog=Array(this.n).fill(0);this.pos=Array(this.n).fill('0,0');this.over=false;this.winner=null;this.awaiting=-1;this.goldCell=null;this.finder=-1;
     this.turn=this.startTurn;this.lastActor=this.turn;
-    const roles=shuffle(['S','D','D','D','D']).slice(0,4);
+    let roles;do{roles=shuffle(rolePool(this.n,this.diff)).slice(0,this.n)}while(DIFFS[this.diff].atLeastOne&&!roles.includes('S'));
     const prev=this.players;
     this.players=this.seats.map((s,i)=>{const o=prev?prev[i]:{name:s.name,ctrl:s.ctrl,conn:s.conn||null,wasRemote:s.ctrl==='remote'};
       return {id:i,name:o.name,ctrl:o.ctrl,conn:o.conn,wasRemote:o.wasRemote,role:roles[i],hand:[],
-      broken:{pick:false,lamp:false,cart:false},known:{},sus:[0,0,0,0],pending:null}});
-    for(const p of this.players)for(let i=0;i<6;i++)p.hand.push(this.deck.pop());
+      broken:{pick:false,lamp:false,cart:false},known:{},sus:Array(this.n).fill(0),pending:null}});
+    const hs=HAND_SIZE(this.n);for(const p of this.players)for(let i=0;i<hs;i++)p.hand.push(this.deck.pop());
     this.board.set(K(0,0),{kind:'start',edges:[true,true,true,true],conn:true});
     const gi=Math.floor(Math.random()*3);
     GOALS.forEach(([x,y],i)=>this.board.set(K(x,y),{kind:'goal',edges:[true,true,true,true],conn:true,goal:i===gi?'gold':'coal',revealed:false}));
   }
   boardPublic(){return [...this.board].map(([k,c])=>({k,kind:c.kind,edges:c.edges,conn:c.conn,revealed:!!c.revealed,goal:c.revealed?c.goal:undefined}))}
   syncFor(pid,full,newGame){const p=this.players[pid];
-    return {full:!!full,newGame:!!newGame,me:pid,round:this.round,rounds:this.rounds,gold:[...this.gold],deck:this.deck.length,turn:this.turn,awaiting:this.awaiting,over:this.over,
+    return {full:!!full,newGame:!!newGame,me:pid,n:this.n,hand0:HAND_SIZE(this.n),round:this.round,rounds:this.rounds,diff:this.diff,gold:[...this.gold],deck:this.deck.length,turn:this.turn,awaiting:this.awaiting,over:this.over,
       players:this.players.map(q=>({id:q.id,name:q.name,ctrl:q.ctrl,n:q.hand.length,broken:{...q.broken},pos:this.pos[q.id]})),
       hand:p?p.hand:[],role:p?p.role:null,known:p?{...p.known}:{},board:full?this.boardPublic():null}}
   evFor(pid,e){if(e.t==='map'&&e.pid!==pid){const {result,...r}=e;return r}return e}
@@ -416,7 +442,7 @@ class Engine{
     while(!this.over&&!this.stopped){
       const p=this.players[this.turn];
       if(!p.hand.length){ if(this.allEmpty()){const ev=[];this.finish('S',ev);await this.broadcast(ev);break}
-        this.turn=(this.turn+1)%4;continue;}
+        this.turn=(this.turn+1)%this.n;continue;}
       this.awaiting=p.id;this.sendSync();
       const a=await this.getAction(p);
       if(this.stopped)return;
@@ -424,7 +450,7 @@ class Engine{
       const evts=this.apply(p,a);
       if(!this.over&&this.deck.length)p.hand.push(this.deck.pop());
       if(!this.over&&this.allEmpty())this.finish('S',evts);
-      if(!this.over)this.turn=(this.turn+1)%4;
+      if(!this.over)this.turn=(this.turn+1)%this.n;
       await this.broadcast(evts);
     }
     this.awaiting=-1;this.sendSync();
@@ -488,14 +514,14 @@ class Engine{
     const awards=[];let drawn=[];
     if(w==='D'){ // draw as many gold cards as players; finder picks first, then the other diggers in turn order
       drawn=this.drawGold(this.players.length).sort((a,b)=>b-a);
-      const order=[];for(let i=0;i<4;i++){const id=(this.finder+i)%4;if(this.players[id].role==='D')order.push(id)}
+      const order=[];for(let i=0;i<this.n;i++){const id=(this.finder+i)%this.n;if(this.players[id].role==='D')order.push(id)}
       drawn.forEach((v,i)=>awards.push({pid:order[i%order.length],v}));
     }else{ // saboteurs: 1 → 4 nuggets, 2–3 → 3 each, 4 → 2 each
-      const sabs=this.players.filter(p=>p.role==='S'),amt=sabs.length===1?4:sabs.length<=3?3:2;
+      const sabs=this.players.filter(p=>p.role==='S'),amt=SAB_PAY(sabs.length);
       sabs.forEach(p=>awards.push({pid:p.id,v:amt}));
     }
     for(const a of awards)this.gold[a.pid]+=a.v;
-    this.startTurn=(this.lastActor+1)%4;
+    this.startTurn=(this.lastActor+1)%this.n;
     ev.push({t:'end',winner:w,roles:this.players.map(p=>p.role),goals:GOALS.map(([x,y])=>({x,y,goal:this.board.get(K(x,y)).goal})),path:w==='D'?this.pathToGold():null,
       finder:this.finder,drawn,awards,gold:[...this.gold],round:this.round,rounds:this.rounds,final:this.round>=this.rounds});
   }
@@ -524,34 +550,42 @@ function targetsFor(E,p){
   return t.length?t:(hidden.length?hidden:GOALS);
 }
 function aiDecide(E,p){
-  const sab=p.role==='S',hand=p.hand,others=E.players.filter(q=>q!==p),B=E.board;
+  const sab=p.role==='S',hand=p.hand,others=E.players.filter(q=>q!==p),B=E.board,lv=DIFFS[E.diff].ai;
   const targets=targetsFor(E,p),cur=frontierDistOf(B,targets),sus=p.sus,opts=[];
+  // a saboteur who knows where the coal is can lure the diggers that way
+  const coal=GOALS.filter(([x,y])=>!B.get(K(x,y)).revealed&&p.known[K(x,y)]==='coal'),lure=sab&&lv>=2&&coal.length?frontierDistOf(B,coal):null;
   for(const c of hand)if(c.type==='fix'){const t=c.tools.find(t=>p.broken[t]);if(t)opts.push({s:100,a:{kind:'fix',card:c,target:p,tool:t}})}
   if(!isBroken(p.broken))for(const c of hand)if(c.type==='path'){
     for(const pl of placementsOf(B,c)){const e=rotEdges(c.edges,pl.rot);
       const b2=new Map(B);b2.set(K(pl.x,pl.y),{kind:'path',edges:e,conn:c.conn});const nd=frontierDistOf(b2,targets);let s;
       if(!sab){if(!c.conn)continue;s=(cur-nd)*20+(nd<cur?40:0)-(nd>=cur?60:0)+Math.random()*12-(Math.random()<.4?70:0)}
-      else{s=(nd-cur)*25+(c.conn?0:30)-(nd<=cur?80:0)+Math.random()*3;if(s<0&&nd>=cur-.05)s=8+Math.random()*4}
+      else{s=(nd-cur)*25+(c.conn?0:30)-(nd<=cur?80:0)+Math.random()*3;if(s<0&&nd>=cur-.05)s=8+Math.random()*4;
+        if(lv>=1&&!c.conn&&cur>5)s-=60;            // keep dead ends hidden until the tunnel gets close
+        if(lure!==null&&c.conn&&nd>=cur-.05){const nl=frontierDistOf(b2,coal);if(nl<lure)s=Math.max(s,22+(lure-nl)*6)} // dig toward coal, looks helpful
+      }
       opts.push({s,a:{kind:'path',card:c,...pl}});}}
   const unk=GOALS.filter(([x,y])=>!B.get(K(x,y)).revealed&&!p.known[K(x,y)]);
   const goldKnown=targets.length===1&&p.known[K(...targets[0])]==='gold';
   if(!goldKnown&&unk.length>1)for(const c of hand)if(c.type==='map'){const side=unk.filter(([x,y])=>y!==0);const g=rnd(side.length?side:unk);
-    opts.push({s:sab?30:(cur<=4?65:35),a:{kind:'map',card:c,x:g[0],y:g[1]}});break}
+    opts.push({s:sab?(lv>=2&&!coal.length?48:30):(cur<=4?65:35),a:{kind:'map',card:c,x:g[0],y:g[1]}});break}
   for(const c of hand)if(c.type==='rockfall'){
     for(const [k,v] of B)if(v.kind==='path'){const [x,y]=XY(k);const b2=new Map(B);b2.delete(k);const nd=frontierDistOf(b2,targets);
-      const s=sab?(nd-cur)*25-(nd<=cur?100:0)+(cur<=3?45:0):(cur-nd)*30+(!v.conn?15:0)-(nd>=cur?100:0);
+      const s=sab?(nd-cur)*25-(nd<=cur?100:0)+(cur<=3?45:0)+(lv>=1&&cur<=4?25:0):(cur-nd)*30+(!v.conn?15:0)-(nd>=cur?100:0);
       opts.push({s,a:{kind:'rockfall',card:c,x,y}})}break}
   for(const c of hand)if(c.type==='break')for(const q of others)if(!q.broken[c.tool]){
-    const s=!sab?(sus[q.id]>=3?45+sus[q.id]*5:-50):40+(cur<=5?35:0)-sus[q.id]*5+Math.random()*10;
+    const s=!sab?(sus[q.id]>=(lv>=1?4:3)?45+sus[q.id]*5:-50)
+      :lv>=1?((cur<=5?70:4)+(E.prog[q.id]||0)*6-sus[q.id]*4-(isBroken(q.broken)?25:0)+(cur<=4&&q.id===(p.id+1)%E.n?30:0)+Math.random()*8)
+      :40+(cur<=5?35:0)-sus[q.id]*5+Math.random()*10;
     opts.push({s,a:{kind:'break',card:c,target:q}})}
   for(const c of hand)if(c.type==='fix')for(const q of others){const t=c.tools.find(t=>q.broken[t]);if(!t)continue;
-    opts.push({s:sab?-40:(sus[q.id]<=-1?50-sus[q.id]*5:-30),a:{kind:'fix',card:c,target:q,tool:t}})}
+    opts.push({s:sab?(lv>=2&&cur>5&&sus[q.id]<=0?24:-40):(sus[q.id]<=-1?50-sus[q.id]*5:-30),a:{kind:'fix',card:c,target:q,tool:t}})}
   opts.sort((a,b)=>b.s-a.s);
   if(opts.length&&opts[0].s>0)return opts[0].a;
   const val=c=>c.type==='path'?(sab?(c.conn?1:6):(c.conn?5:0)):c.type==='fix'?(sab?0:4):c.type==='break'?(sab?6:3):c.type==='map'?(goldKnown?0:4):3;
   return {kind:'discard',card:[...hand].sort((a,b)=>val(a)-val(b))[0]};
 }
 function observe(E,actor,a,before,after){
+  if(a.kind==='path'&&after<before)E.prog[actor.id]=(E.prog[actor.id]||0)+1;
   for(const ob of E.players){if(ob===actor)continue;const s=ob.sus;
     if(a.kind==='path'||a.kind==='rockfall'){const d=after-before;if(d>0)s[actor.id]+=2;else if(d<0)s[actor.id]-=1;if(a.kind==='path'&&!a.card.conn)s[actor.id]+=1}
     if(a.kind==='break'){if(a.target===ob)s[actor.id]+=ob.role==='D'?2:-1;else if(s[a.target.id]>=2)s[actor.id]-=1;else s[actor.id]+=1}
@@ -788,11 +822,14 @@ function burst(pos,color,n=24,sp=3,up=3,life=1){if(FAST.test)return;
 /* =========================================================
    VIEW — what each device sees (public board + own secrets)
    ========================================================= */
-const PCOL=['#3fa7ff','#e85d4a','#59c26a','#b07ce8'];
-const SLOT=[[-.15,-.15],[.15,-.15],[-.15,.15],[.15,.15]]; // where each miner stands inside a cell (tile units)
+const PCOL=['#3fa7ff','#e85d4a','#59c26a','#b07ce8','#ffb43a','#3fd6c8','#ff7ac0','#a8d84a','#c9a27a','#e8e8e8'];
+// where each miner stands inside a cell (tile units): 2x2 for small tables, a ring for bigger ones
+function slotOf(pid){const n=VIEW.players.length||4;
+  if(n<=4)return [[-.15,-.15],[.15,-.15],[-.15,.15],[.15,.15]][pid];
+  const a=pid/n*Math.PI*2-Math.PI/2,r=n<=6?.19:.22;return [Math.cos(a)*r,Math.sin(a)*r]}
 const CY=.21*S; // goal cover half-height
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const VIEW={round:1,rounds:3,gold:[0,0,0,0],me:0,board:new Map(),players:[],hand:[],role:null,known:{},turn:0,awaiting:-1,over:false,deck:0,chain:Promise.resolve(),busy:false,end:null,
+const VIEW={n:4,diff:'std',round:1,rounds:3,gold:[0,0,0,0],me:0,board:new Map(),players:[],hand:[],role:null,known:{},turn:0,awaiting:-1,over:false,deck:0,chain:Promise.resolve(),busy:false,end:null,
   enqueueEvents(evts){this.chain=this.chain.then(async()=>{this.busy=true;renderAll();for(const e of evts){try{await playEvent(e)}catch(err){console.error(err)}}this.busy=false;renderAll()});return this.chain},
   enqueueSync(s){this.chain=this.chain.then(()=>applySync(s));return this.chain}};
 const pn=id=>{const p=VIEW.players[id];return p?`<b style="color:${PCOL[id]}">${esc(p.name)}${id===VIEW.me?'（你）':''}</b>`:'?'};
@@ -824,7 +861,9 @@ function addGoalModel(c,dim){
 
 /* ---------- miners live inside the mine ---------- */
 function standY(key){const c=VIEW.board.get(key);return c&&c.kind==='goal'&&!c.revealed?2*CY:0}
-function cellPos(key,pid){const [x,y]=XY(key);return W(x,y).add(V3(SLOT[pid][0]*S,standY(key),SLOT[pid][1]*S))}
+function cellPos(key,pid){const [x,y]=XY(key),sl=slotOf(pid);return W(x,y).add(V3(sl[0]*S,standY(key),sl[1]*S))}
+function labelY(id){return 1.2+(id%3)*.27}
+function minerScale(){const n=VIEW.players.length;return n<=4?1.05:n<=6?.9:.78}
 function buildMiner(p){
   const g=new THREE.Group();
   const body=asset('Miner',()=>{const m=new THREE.Mesh(new THREE.CapsuleGeometry(.2,.4),new THREE.MeshStandardMaterial({color:PCOL[p.id]}));m.position.y=.4;return m});
@@ -835,9 +874,9 @@ function buildMiner(p){
   const lamp=new THREE.PointLight(0xffdcaa,4,5.5,1.5);lamp.position.set(0,1.05,.35);g.add(lamp);
   const ring=new THREE.Mesh(new THREE.RingGeometry(.3,.4,40),new THREE.MeshBasicMaterial({color:PCOL[p.id],transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false}));
   ring.rotation.x=-Math.PI/2;ring.position.y=.03;g.add(ring);
-  const ly=1.25+p.id*.26,lbl=makeLabel(p.name+(p.id===VIEW.me?'（你）':''),PCOL[p.id],48,.3);lbl.position.set(0,ly,0);g.add(lbl);
+  const ly=labelY(p.id),lbl=makeLabel(p.name+(p.id===VIEW.me?'（你）':''),PCOL[p.id],48,.3);lbl.position.set(0,ly,0);g.add(lbl);
   const icons=new THREE.Group();icons.position.y=ly+.36;icons.position.x=.0;g.add(icons);
-  g.scale.setScalar(1.05);board.add(g);
+  g.scale.setScalar(minerScale());board.add(g);
   p.m={g,body,lamp,ring,icons,lbl,iconKey:''};
   p.pos=p.pos||'0,0';g.position.copy(cellPos(p.pos,p.id));g.rotation.y=Math.PI/4*(p.id%2?1:-1);
 }
@@ -880,12 +919,12 @@ function applySync(s){
     VIEW.me=s.me;VIEW.players=s.players.map(p=>({...p}));
     for(const c of s.board){const [x,y]=XY(c.k);const cc={...c};VIEW.board.set(c.k,cc);cellObj(x,y,cc)}
     VIEW.players.forEach(buildMiner);
-    if(s.newGame){$('log').innerHTML='';log(`第 ${s.round}／${s.rounds} 局開始，所有礦工都在礦井口集合。`);VIEW.end=null;$('mEnd').classList.add('hide');}
+    if(s.newGame){$('log').innerHTML='';log(`第 ${s.round}／${s.rounds} 局開始（${DIFFS[s.diff||'std'].name}），所有礦工都在礦井口集合。`);VIEW.end=null;$('mEnd').classList.add('hide');}
   }else{
     s.players.forEach((p,i)=>{const v=VIEW.players[i];if(v){v.name=p.name;v.ctrl=p.ctrl;v.n=p.n;v.broken=p.broken}});
   }
   const wasMine=VIEW.awaiting===VIEW.me&&!VIEW.over;
-  Object.assign(VIEW,{round:s.round||1,rounds:s.rounds||1,gold:s.gold||[0,0,0,0],me:s.me,hand:s.hand,role:s.role,known:s.known,turn:s.turn,awaiting:s.awaiting,over:s.over,deck:s.deck});
+  Object.assign(VIEW,{n:s.n||s.players.length,diff:s.diff||'std',round:s.round||1,rounds:s.rounds||1,gold:s.gold||Array(s.players.length).fill(0),me:s.me,hand:s.hand,role:s.role,known:s.known,turn:s.turn,awaiting:s.awaiting,over:s.over,deck:s.deck});
   for(const p of VIEW.players){const sp=s.players[p.id];p.n=sp.n;p.broken=sp.broken;p.ctrl=sp.ctrl;if(p.m){refreshIcons(p);
     if(sp.pos&&sp.pos!==p.pos&&VIEW.board.get(sp.pos)){p.pos=sp.pos;p.m.g.position.copy(cellPos(sp.pos,p.id))}}}
   for(const [k,v] of Object.entries(VIEW.known)){const c=VIEW.board.get(k);if(c&&!c.revealed)showPeekBadge(c,v)}
@@ -897,7 +936,8 @@ function applySync(s){
   if(s.newGame)showRole();
 }
 function showPeekBadge(c,v){if(c.peek)return;const l=makeLabel(v==='gold'?'你看過：金':'你看過：煤',v==='gold'?'#ffc23d':'#aaa',40,.32);l.position.set(0,2*CY+.5,0);c.obj.add(l);c.peek=l}
-function setTurnFx(){for(const q of VIEW.players)if(q.m){const on=q.id===VIEW.turn&&!VIEW.over;q.m.ring.material.opacity=on?.9:0;q.m.lamp.intensity=on?10:4}}
+function setTurnFx(){const many=VIEW.players.length>6;for(const q of VIEW.players)if(q.m){const on=q.id===VIEW.turn&&!VIEW.over;
+    q.m.lbl.visible=!many||on||q.id===VIEW.me||VIEW.over;q.m.ring.material.opacity=on?.9:0;q.m.lamp.intensity=on?10:4}}
 
 async function flyBetween(a,b,model,color){
   const pa=VIEW.players[a],pb=VIEW.players[b];if(!pa||!pb)return;
@@ -971,7 +1011,7 @@ async function playEnd(e){
   }
   await wait(500);
   for(const g of e.goals){const c=VIEW.board.get(K(g.x,g.y));if(c&&!c.revealed&&c.cover){c.cover.visible=false;c.goal=g.goal;if(c.peek){c.obj.remove(c.peek);c.peek=null}addGoalModel(c,true)}}
-  VIEW.players.forEach((p,i)=>{const r=e.roles[i],l=makeLabel(r==='S'?'搗蛋鬼':'淘金者',r==='S'?'#ff5a4a':'#ffc23d',40);l.position.set(0,1.25+p.id*.26+.36,0);p.m.g.add(l)});
+  VIEW.players.forEach((p,i)=>{const r=e.roles[i],l=makeLabel(r==='S'?'搗蛋鬼':'淘金者',r==='S'?'#ff5a4a':'#ffc23d',40);l.position.set(0,labelY(p.id)+.36,0);p.m.g.add(l)});
   const myRole=e.roles[VIEW.me],meWin=myRole===e.winner;
   SFX.play(meWin?'win':'lose');duck(3000);
   // gold nuggets fly to each winner
@@ -990,6 +1030,7 @@ async function playEnd(e){
   if(e.winner==='D'&&e.drawn.length)html+=`<div class="dim" style="margin-bottom:6px">${pn(e.finder)} 挖到金脈，抽出 ${e.drawn.length} 張金塊卡：${e.drawn.map(v=>`<span class="nug">🪙${v}</span>`).join(' ')}<br>由他先挑，再依順序分給其他淘金者。</div>`;
   else if(e.winner==='S'&&e.awards.length)html+=`<div class="dim" style="margin-bottom:6px">搗蛋鬼得到 ${e.awards[0].v} 塊金。</div>`;
   else if(e.winner==='S')html+=`<div class="dim" style="margin-bottom:6px">這局沒有搗蛋鬼，沒有人拿到金塊。</div>`;
+  if(e.winner==='S'&&e.awards.length>1)html=html.replace(`搗蛋鬼得到 ${e.awards[0].v} 塊金。`,`${e.awards.length} 名搗蛋鬼各得 ${e.awards[0].v} 塊金。`);
   const rank=VIEW.players.map((p,i)=>({i,g:e.gold[i]})).sort((a,b)=>b.g-a.g);
   html+=`<table class="score"><tr><th>礦工</th><th>身分</th><th>本局</th><th>總計</th></tr>`+
     rank.map(({i})=>`<tr><td>${pn(i)}</td><td>${e.roles[i]==='S'?'😈':'⛏'}</td><td>${got(i).length?got(i).map(v=>'🪙'+v).join(' '):'—'}</td><td><b>${e.gold[i]}</b></td></tr>`).join('')+`</table>`;
@@ -1028,7 +1069,7 @@ function cardEl(card){
   d.onclick=()=>selectCard(card);return d;
 }
 function renderAll(){
-  const P=$('players');P.innerHTML='';
+  const P=$('players');P.innerHTML='';P.classList.toggle('many',VIEW.players.length>6);
   for(const p of VIEW.players){const d=document.createElement('div');d.className='pl'+(VIEW.turn===p.id&&!VIEW.over?' turn':'');
     const tools=Object.keys(p.broken).filter(t=>p.broken[t]).map(t=>`<span title="${TOOLNAME[t]}壞了" style="filter:drop-shadow(0 0 3px #f44)">${TOOLS[t]}</span>`).join('');
     const tag=p.ctrl==='ai'?'<span class="tag">AI</span>':'';
@@ -1038,10 +1079,10 @@ function renderAll(){
   const r=VIEW.role;
   $('role').innerHTML=r?`你的身分：<b style="color:${r==='S'?'var(--red)':'var(--gold)'}">${r==='S'?'😈 搗蛋鬼':'⛏ 淘金者'}</b><span class="rdesc"><br><span style="font-size:11px;color:var(--dim)">${r==='S'?'別讓他們挖到金脈，但別被識破。':'找出金脈，小心身邊的搗蛋鬼。'}</span></span>`:'';
   const cur=VIEW.players[VIEW.turn];
-  $('status').innerHTML=!GAME_ON?'':VIEW.over?'<b>本局結束</b>':`<span class="dim">第 ${VIEW.round}／${VIEW.rounds} 局</span><br>輪到：${cur?pn(cur.id):''}${VIEW.turn===VIEW.me?' — 選一張牌':' 思考中…'}<br><span class="dim">牌庫剩 ${VIEW.deck} 張</span>`;
+  $('status').innerHTML=!GAME_ON?'':VIEW.over?'<b>本局結束</b>':`<span class="dim">第 ${VIEW.round}／${VIEW.rounds} 局 · ${VIEW.n} 人 · ${DIFFS[VIEW.diff].name}</span><br>輪到：${cur?pn(cur.id):''}${VIEW.turn===VIEW.me?' — 選一張牌':' 思考中…'}<br><span class="dim">牌庫剩 ${VIEW.deck} 張</span>`;
   const H=$('hand');H.innerHTML='';VIEW.hand.forEach(c=>H.appendChild(cardEl(c)));
   $('handWrap').style.display=GAME_ON?'flex':'none';
-  $('mDeck').textContent=GAME_ON?`第${VIEW.round}/${VIEW.rounds}局 · 牌庫 ${VIEW.deck}`:'';
+  $('mDeck').innerHTML=GAME_ON?`${VIEW.role?`<b style="color:${VIEW.role==='S'?'var(--red)':'var(--gold)'}">${VIEW.role==='S'?'😈搗蛋鬼':'⛏淘金者'}</b> · `:''}${VIEW.round}/${VIEW.rounds}局 · 牌庫${VIEW.deck}`:'';
   const can=myTurn();
   $('bRot').disabled=!(can&&UI.sel&&UI.sel.type==='path');$('bDiscard').disabled=!(can&&UI.sel);$('bCancel').disabled=!UI.sel;
   $('netBadge').innerHTML=NET.mode==='solo'?'<span class="dim">單人模式</span>':NET.mode==='host'?`<span style="color:var(--green)">● 房主</span> <span class="dim">房號 ${NET.code}</span>`:NET.mode==='client'?`<span style="color:var(--blue)">● 已連線</span> <span class="dim">房號 ${NET.code}</span>`:'';
@@ -1112,7 +1153,9 @@ canvas.addEventListener('pointerdown',closeMenu);$('bRulesClose').onclick=()=>$(
 /* =========================================================
    GAME SESSION + NETWORK (PeerJS, host-authoritative)
    ========================================================= */
-let ENGINE=null,GAME_ON=false,ROUNDS=3;
+let ENGINE=null,GAME_ON=false,ROUNDS=3,DIFF='std',NPLAYERS=4;
+try{NPLAYERS=+localStorage.getItem('dv-n')||4;if(!ROLE_TABLE[NPLAYERS])NPLAYERS=4}catch(e){}
+try{DIFF=localStorage.getItem('dv-diff')||'std';if(!DIFFS[DIFF])DIFF='std'}catch(e){}
 try{ROUNDS=+localStorage.getItem('dv-rounds')||3}catch(e){}
 const NET={mode:null,peer:null,code:'',pass:'',hostConn:null,members:[],name:''};
 const PEER_PREFIX='deepvein-v2-';
@@ -1131,11 +1174,11 @@ $('bGo').onclick=()=>{$('mStart').classList.add('hide');startMusic();if(ENGINE&&
 
 function beginEngine(seats){
   if(ENGINE)ENGINE.stop();
-  ENGINE=new Engine(seats,0,ROUNDS);GAME_ON=true;$('mLobby').classList.add('hide');
+  ENGINE=new Engine(seats,0,ROUNDS,DIFF);GAME_ON=true;$('mLobby').classList.add('hide');
   for(const p of ENGINE.remotes())safeSend(p.conn,{type:'start'});
   ENGINE.sendSync(true,true);
 }
-function aiFill(seats){const used=new Set(seats.map(s=>s.name));const pool=AINAMES.filter(n=>!used.has(n));while(seats.length<4)seats.push({name:pool.shift(),ctrl:'ai'});return seats}
+function aiFill(seats,n=NPLAYERS){const used=new Set(seats.map(s=>s.name));const pool=AINAMES.filter(n=>!used.has(n));while(seats.length<n)seats.push({name:pool.shift(),ctrl:'ai'});return seats}
 function startSolo(){NET.mode='solo';beginEngine(aiFill([{name:NET.name,ctrl:'local'}]))}
 function startOnline(){
   const seats=[{name:NET.name,ctrl:'local'}];
@@ -1154,11 +1197,11 @@ function leave(){try{if(NET.peer)NET.peer.destroy()}catch(e){}const u=new URL(lo
 /* ---------- host ---------- */
 function lobbyBroadcast(){
   const names=[NET.name,...NET.members.map(m=>m.name)];
-  for(const m of NET.members)safeSend(m.conn,{type:'lobby',names,code:NET.code,rounds:ROUNDS});
+  for(const m of NET.members)safeSend(m.conn,{type:'lobby',names,code:NET.code,rounds:ROUNDS,diff:DIFF,n:NPLAYERS});
   renderMembers($('hostMembers'),names);
 }
 function renderMembers(el,names){
-  el.innerHTML='';for(let i=0;i<4;i++){const n=names[i];
+  el.innerHTML='';for(let i=0;i<NPLAYERS;i++){const n=names[i];
     el.insertAdjacentHTML('beforeend',n?`<div class="member"><span class="dot" style="background:${PCOL[i]}"></span>${esc(n)}${i===0?' <span class="dim">（房主）</span>':''}</div>`:'<div class="member empty">空位（開始時由 AI 補上）</div>')}
 }
 function createRoom(){
@@ -1189,7 +1232,7 @@ function hostOnData(conn,m){
       safeSend(conn,{type:'sync',s:ENGINE.syncFor(p.id,true,false)});
       ENGINE.broadcast([{t:'log',msg:`<b>${esc(name)}</b> 重新連線`}]);ENGINE.sendSync();SFX.play('join');return;
     }
-    if(NET.members.length>=3)return reject(conn,'房間已滿（最多 4 人）。');
+    if(NET.members.length>=NPLAYERS-1)return reject(conn,`房間已滿（這局設定 ${NPLAYERS} 人）。`);
     const names=[NET.name,...NET.members.map(x=>x.name)];let n=name,i=2;while(names.includes(n))n=name+i++;
     NET.members.push({name:n,conn});safeSend(conn,{type:'welcome',code:NET.code,name:n});lobbyBroadcast();SFX.play('join');
   }else if(m.type==='act'&&ENGINE){const p=ENGINE.players.find(q=>q.conn===conn);if(p)ENGINE.receive(p.id,m.a)}
@@ -1221,7 +1264,7 @@ function joinRoom(){
 function clientOnData(m){
   if(m.type==='reject'){$('bJoin').disabled=false;lobbyErr(m.reason);NET.mode=null;return}
   if(m.type==='welcome'){NET.mode='client';if(m.name)NET.name=m.name;lobbyErr('');$('joinForm').style.display='none';$('joinRoom').style.display='';$('joinCodeShow').textContent=m.code;SFX.play('join');return}
-  if(m.type==='lobby'){renderMembers($('joinMembers'),m.names);if(m.rounds){ROUNDS=m.rounds;document.querySelectorAll('#segRounds button').forEach(x=>x.classList.toggle('on',+x.dataset.r===m.rounds))}return}
+  if(m.type==='lobby'){if(m.n){NPLAYERS=m.n;document.querySelectorAll('#segN button').forEach(x=>x.classList.toggle('on',+x.dataset.n===m.n));$('nDesc').textContent=nDesc(m.n)}renderMembers($('joinMembers'),m.names);if(m.diff&&DIFFS[m.diff]){DIFF=m.diff;document.querySelectorAll('#segDiff button').forEach(x=>x.classList.toggle('on',x.dataset.d===m.diff));$('diffDesc').textContent=DIFFS[m.diff].desc}if(m.rounds){ROUNDS=m.rounds;document.querySelectorAll('#segRounds button').forEach(x=>x.classList.toggle('on',+x.dataset.r===m.rounds))}return}
   if(m.type==='start'){GAME_ON=true;$('mLobby').classList.add('hide');$('mEnd').classList.add('hide');return}
   if(m.type==='sync'){VIEW.enqueueSync(m.s);return}
   if(m.type==='events'){VIEW.enqueueEvents(m.evts);return}
@@ -1233,6 +1276,15 @@ function lobbyErr(t){$('lobbyErr').textContent=t}
 /* ---------- lobby wiring ---------- */
 function setRounds(r){ROUNDS=r;try{localStorage.setItem('dv-rounds',r)}catch(e){}
   document.querySelectorAll('#segRounds button').forEach(x=>x.classList.toggle('on',+x.dataset.r===r));if(NET.mode==='host')lobbyBroadcast()}
+function nDesc(n){const [sb,dg]=ROLE_TABLE[n];return `${n} 人：身分卡 ${sb} 張搗蛋鬼＋${dg} 張淘金者（抽 ${n} 張，剩 1 張不公開），每人手牌 ${HAND_SIZE(n)} 張`}
+function setN(n){if(NET.mode==='host'&&n<NET.members.length+1){lobbyErr(`已經有 ${NET.members.length+1} 人在房間裡，不能少於這個人數`);return}
+  NPLAYERS=n;try{localStorage.setItem('dv-n',n)}catch(e){}
+  document.querySelectorAll('#segN button').forEach(x=>x.classList.toggle('on',+x.dataset.n===n));$('nDesc').textContent=nDesc(n);
+  $('soloDesc').textContent=`和 ${n-1} 個 AI 礦工對戰，馬上開始。`;if(NET.mode==='host')lobbyBroadcast()}
+document.querySelectorAll('#segN button').forEach(b=>b.onclick=()=>{if(NET.mode==='client')return;setN(+b.dataset.n);SFX.init();SFX.play('select')});
+function setDiff(d){DIFF=d;try{localStorage.setItem('dv-diff',d)}catch(e){}
+  document.querySelectorAll('#segDiff button').forEach(x=>x.classList.toggle('on',x.dataset.d===d));$('diffDesc').textContent=DIFFS[d].desc;if(NET.mode==='host')lobbyBroadcast()}
+document.querySelectorAll('#segDiff button').forEach(b=>b.onclick=()=>{if(NET.mode==='client')return;setDiff(b.dataset.d);SFX.init();SFX.play('select')});
 document.querySelectorAll('#segRounds button').forEach(b=>b.onclick=()=>{if(NET.mode==='client')return;setRounds(+b.dataset.r);SFX.init();SFX.play('select')});
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   if(NET.mode==='host'||NET.mode==='client')return;
@@ -1248,7 +1300,7 @@ $('bCopyLink').onclick=async()=>{const u=new URL(location.href);u.searchParams.s
   try{await navigator.clipboard.writeText(u.toString());$('bCopyLink').textContent='已複製 ✓'}catch(e){$('bCopyLink').textContent=u.toString()}};
 function showLobby(){
   try{$('iName').value=localStorage.getItem('dv-name')||''}catch(e){}
-  $('iHostCode').value=randCode();setRounds([1,3,5].includes(ROUNDS)?ROUNDS:3);
+  $('iHostCode').value=randCode();setRounds([1,3,5].includes(ROUNDS)?ROUNDS:3);setDiff(DIFF);setN(NPLAYERS);
   const room=QS.get('room');
   if(room){$('iJoinCode').value=room.toUpperCase();document.querySelector('.tabs button[data-tab="join"]').click()}
   if(!netOK())$('netNote').innerHTML='⚠️ 這個環境無法使用線上連線，只能玩單人模式。線上對戰請使用 GitHub Pages 版本。';
@@ -1291,7 +1343,7 @@ function loop(){
 
 // test hooks
 window.DV={cam:()=>({p:camera.position.toArray().map(v=>+v.toFixed(2)),t:controls.target.toArray().map(v=>+v.toFixed(2)),fov:camera.fov,w:innerWidth,h:innerHeight,rot:world.rotation.y}),VIEW,NET,FAST,SFX,SOUNDS,UI,cellScreen(x,y){const v=W(x,y).setY(.12);board.localToWorld(v);v.project(camera);return [(v.x+1)/2*innerWidth,(1-v.y)/2*innerHeight]},get ENGINE(){return ENGINE},
-  async autoplay(){FAST.test=true;NET.mode='solo';beginEngine(aiFill([]).map(s=>({...s,ctrl:'ai'})));await VIEW.chain;await ENGINE.run();await VIEW.chain;
+  async autoplay(d,n){if(d)DIFF=d;if(n)NPLAYERS=n;FAST.test=true;NET.mode='solo';beginEngine(aiFill([]).map(s=>({...s,ctrl:'ai'})));await VIEW.chain;await ENGINE.run();await VIEW.chain;
     return {winner:ENGINE.winner,deck:ENGINE.deck.length,sab:ENGINE.players.some(p=>p.role==='S')}},
   async autoMatch(r=3){FAST.test=true;NET.mode='solo';ROUNDS=r;beginEngine(aiFill([]).map(s=>({...s,ctrl:'ai'})));const out=[];
     while(true){await VIEW.chain;await ENGINE.run();await VIEW.chain;out.push({w:ENGINE.winner,gold:[...ENGINE.gold]});if(ENGINE.round>=ENGINE.rounds)break;ENGINE.nextRound();ENGINE.sendSync(true,true)}
