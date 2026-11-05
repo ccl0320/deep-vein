@@ -558,7 +558,9 @@ scene.add(dust);
 
 const ASSETS={};
 async function loadAssets(){
-  const buf=await (await fetch('assets/deepvein_assets.glb')).arrayBuffer();
+  const emb=document.getElementById('glb');let buf;
+  if(emb&&emb.textContent.trim())buf=Uint8Array.from(atob(emb.textContent.trim()),c=>c.charCodeAt(0)).buffer;
+  else buf=await (await fetch('assets/deepvein_assets.glb')).arrayBuffer();
   const gltf=await new GLTFLoader().parseAsync(buf,'');
   gltf.scene.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
   for(const o of gltf.scene.children)ASSETS[o.name]=o;
