@@ -999,6 +999,8 @@ function showLobby(){
   const room=QS.get('room');
   if(room){$('iJoinCode').value=room.toUpperCase();document.querySelector('.tabs button[data-tab="join"]').click()}
   if(!netOK())$('netNote').innerHTML='⚠️ 這個環境無法使用線上連線，只能玩單人模式。線上對戰請使用 GitHub Pages 版本。';
+  const h=location.hostname;if(netOK()&&!/github\.io$|^localhost$|^127\.|^192\.168\./.test(h))
+    $('netNote').innerHTML='線上對戰請到 <a style="color:var(--gold)" href="https://ccl0320.github.io/deep-vein/">ccl0320.github.io/deep-vein</a>，這個頁面可能無法連線。';
   $('mLobby').classList.remove('hide');
 }
 
