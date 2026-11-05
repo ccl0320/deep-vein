@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>深坑淘金 Deep Vein — 3D 線上礦坑隱藏身分遊戲</title>
+<meta name="description" content="3D 線上多人隱藏身分挖礦遊戲：建立房間、輸入密碼，和朋友用不同裝置一起挖金脈。">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#120d09;--panel:rgba(28,20,14,.88);--line:rgba(255,200,120,.18);--gold:#ffc23d;--txt:#f3e6d2;--dim:#b8a58c;--red:#ff5a4a;--green:#5fd47a;--blue:#4fb4ff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:"Noto Sans TC",system-ui,sans-serif;overflow:hidden}
+#c{position:fixed;inset:0;display:block;touch-action:none}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(6px)}
+#top{position:fixed;left:12px;top:12px;display:flex;flex-direction:column;gap:8px;width:230px;z-index:5}
+#title{padding:10px 12px}
+#title h1{margin:0;font-size:18px;font-weight:900;letter-spacing:1px;color:var(--gold)}
+#title .sub{font-size:11px;color:var(--dim)}
+#players{padding:6px}
+.pl{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:1px solid transparent;transition:.15s}
+.pl .dot{width:12px;height:12px;border-radius:50%;flex:none}
+.pl .nm{font-weight:700;font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl .tag{font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.pl .cnt{font-size:11px;color:var(--dim)}
+.pl .tools{font-size:13px;min-width:40px;text-align:right}
+.pl.turn{border-color:var(--gold);background:rgba(255,194,61,.1)}
+.pl.target{border-color:var(--green);background:rgba(95,212,122,.15);cursor:pointer;animation:pulse 1s infinite}
+.pl.target.bad{border-color:var(--red);background:rgba(255,90,74,.15)}
+@keyframes pulse{50%{transform:scale(1.03)}}
+#role{padding:10px 12px;font-size:13px}
+#role b{font-size:16px}
+#info{position:fixed;right:12px;top:12px;width:260px;z-index:5;display:flex;flex-direction:column;gap:8px}
+#status{padding:10px 12px;font-size:13px;line-height:1.5}
+#log{padding:8px 12px;font-size:12px;max-height:34vh;overflow:auto;line-height:1.6;color:var(--dim)}
+#log div b{color:var(--txt)}
+#ctrl{display:flex;gap:6px;flex-wrap:wrap}
+button{font-family:inherit;background:#3a2a1b;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;font-weight:700}
+button:hover:not(:disabled){background:#4d3823}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:var(--gold);color:#2a1a08;border-color:#ffd77a}
+button.primary:hover:not(:disabled){background:#ffd166}
+button.off{opacity:.55;text-decoration:line-through}
+#handWrap{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:6;display:flex;flex-direction:column;align-items:center;gap:6px;max-width:96vw}
+#hand{display:flex;gap:8px;padding:10px;overflow-x:auto;max-width:96vw;min-height:60px}
+.card{width:78px;height:112px;flex:none;border-radius:9px;background:linear-gradient(160deg,#6b4e33,#3b2a1b);border:2px solid #8c6a45;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:transform .15s,border-color .15s;position:relative;user-select:none}
+.card:hover{transform:translateY(-6px)}
+.card.sel{border-color:var(--gold);transform:translateY(-14px);box-shadow:0 0 18px rgba(255,194,61,.5)}
+.card canvas{width:62px;height:62px}
+.card .lbl{font-size:11px;font-weight:700;text-align:center;line-height:1.2;padding:0 3px}
+.card .em{font-size:30px;line-height:1}
+.card.blocked::after{content:"工具損壞";position:absolute;top:4px;right:4px;font-size:9px;background:var(--red);color:#fff;padding:1px 4px;border-radius:4px}
+#actions{display:flex;gap:6px;padding:6px 10px}
+#hint{font-size:12px;color:var(--txt);padding:3px 10px;text-align:center;min-height:16px;text-shadow:0 1px 3px #000}
+.modal{position:fixed;inset:0;background:rgba(5,3,2,.74);display:flex;align-items:center;justify-content:center;z-index:20}
+.modal.hide{display:none}
+.mbox{width:min(560px,92vw);max-height:90vh;overflow:auto;padding:22px 24px}
+.mbox h2{margin:0 0 6px;color:var(--gold);font-weight:900}
+.mbox p,.mbox li{font-size:14px;line-height:1.7;color:var(--txt)}
+.dim{color:var(--dim);font-size:12px}
+.rolecard{width:160px;height:225px;margin:14px auto;perspective:800px}
+.rolecard .in{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform 1s cubic-bezier(.2,.8,.2,1)}
+.rolecard.flip .in{transform:rotateY(180deg)}
+.rolecard .f,.rolecard .b{position:absolute;inset:0;border-radius:14px;backface-visibility:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;border:3px solid #a07a4c;font-weight:900}
+.rolecard .f{background:repeating-linear-gradient(45deg,#4a3420 0 10px,#3d2a19 10px 20px);font-size:44px;color:#a07a4c}
+.rolecard .b{transform:rotateY(180deg);background:linear-gradient(160deg,#5b4128,#2c1e12);font-size:20px;gap:8px}
+.rolecard .b .big{font-size:64px}
+#toast{position:fixed;left:50%;top:18%;transform:translate(-50%,-50%) scale(.8);opacity:0;z-index:25;padding:14px 26px;font-size:20px;font-weight:900;color:var(--gold);transition:.3s;pointer-events:none;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:30;background:var(--bg);font-size:16px;color:var(--dim)}
+/* lobby */
+.tabs{display:flex;gap:6px;margin:12px 0}
+.tabs button{flex:1}
+.tabs button.on{background:var(--gold);color:#2a1a08}
+.field{display:flex;flex-direction:column;gap:4px;margin:10px 0}
+.field label{font-size:12px;color:var(--dim)}
+.field input{font-family:inherit;font-size:16px;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:#1d150f;color:var(--txt);outline:none}
+.field input:focus{border-color:var(--gold)}
+.row{display:flex;gap:8px;align-items:center}
+.members{margin:10px 0;display:flex;flex-direction:column;gap:6px}
+.member{display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-weight:700}
+.member .dot{width:10px;height:10px;border-radius:50%}
+.member.empty{color:var(--dim);font-weight:400;border-style:dashed}
+.code{font-size:28px;font-weight:900;letter-spacing:6px;color:var(--gold);text-align:center;padding:6px;border:2px dashed var(--gold);border-radius:10px;margin:8px 0}
+.err{color:var(--red);font-size:13px;min-height:18px}
+.netnote{font-size:12px;color:var(--dim);background:rgba(255,194,61,.07);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:8px}
+#netBadge{font-size:11px;margin-top:4px}
+#players:empty,#role:empty,#status:empty,#log:empty{display:none}
+#handWrap{display:none}
+@media (max-width:820px){
+  #top{width:170px}#info{width:180px}#log{max-height:18vh}
+  .card{width:62px;height:92px}.card canvas{width:48px;height:48px}.card .em{font-size:24px}
+  #title h1{font-size:15px}
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="loading">載入礦坑中…</div>
+
+<div id="top">
+  <div id="title" class="panel"><h1>⛏ 深坑淘金</h1><div class="sub">Deep Vein · 3D 隱藏身分挖礦</div><div id="netBadge"></div></div>
+  <div id="players" class="panel"></div>
+  <div id="role" class="panel"></div>
+</div>
+
+<div id="info">
+  <div id="status" class="panel"></div>
+  <div id="ctrl">
+    <button id="bMusic" title="背景音樂">🎵 音樂</button>
+    <button id="bSfx" title="動作音效">🔊 音效</button>
+    <button id="bRules">規則</button>
+    <button id="bFast">快轉</button>
+    <button id="bCam">視角</button>
+    <button id="bLeave">離開</button>
+  </div>
+  <div id="log" class="panel"></div>
+</div>
+
+<div id="handWrap">
+  <div id="hint"></div>
+  <div id="actions" class="panel">
+    <button id="bRot">↻ 旋轉 (R)</button>
+    <button id="bDiscard">棄掉這張</button>
+    <button id="bCancel">取消</button>
+  </div>
+  <div id="hand" class="panel"></div>
+</div>
+
+<div id="toast" class="panel"></div>
+
+<!-- LOBBY -->
+<div id="mLobby" class="modal hide"><div class="mbox panel">
+  <h2>⛏ 深坑淘金 Deep Vein</h2>
+  <p class="dim" style="margin:0">4 名礦工、3 張終點卡，只有一張底下是金脈。你們之中可能藏著搗蛋鬼。</p>
+  <div class="field"><label>你的暱稱</label><input id="iName" maxlength="10" placeholder="例如：Jerry"></div>
+  <div class="tabs"><button data-tab="solo" class="on">單人 vs AI</button><button data-tab="host">建立房間</button><button data-tab="join">加入房間</button></div>
+
+  <div data-pane="solo">
+    <p class="dim">和 3 個 AI 礦工對戰，馬上開始。</p>
+    <button class="primary" id="bSolo" style="width:100%">開始遊戲</button>
+  </div>
+
+  <div data-pane="host" style="display:none">
+    <div id="hostForm">
+      <div class="row">
+        <div class="field" style="flex:1"><label>房號（可自訂，英數 4–8 碼）</label><input id="iHostCode" maxlength="8"></div>
+        <div class="field" style="flex:1"><label>房間密碼（可留空）</label><input id="iHostPass" maxlength="16" type="text"></div>
+      </div>
+      <button class="primary" id="bHost" style="width:100%">建立房間</button>
+    </div>
+    <div id="hostRoom" style="display:none">
+      <div class="dim">把房號和密碼告訴朋友，或直接傳邀請連結：</div>
+      <div class="code" id="hostCodeShow"></div>
+      <div class="row"><button id="bCopyLink" style="flex:1">複製邀請連結</button><span id="passShow" class="dim"></span></div>
+      <div class="members" id="hostMembers"></div>
+      <button class="primary" id="bStartOnline" style="width:100%">開始遊戲（空位由 AI 補上）</button>
+    </div>
+  </div>
+
+  <div data-pane="join" style="display:none">
+    <div id="joinForm">
+      <div class="row">
+        <div class="field" style="flex:1"><label>房號</label><input id="iJoinCode" maxlength="8"></div>
+        <div class="field" style="flex:1"><label>房間密碼</label><input id="iJoinPass" maxlength="16"></div>
+      </div>
+      <button class="primary" id="bJoin" style="width:100%">加入房間</button>
+    </div>
+    <div id="joinRoom" style="display:none">
+      <div class="code" id="joinCodeShow"></div>
+      <div class="members" id="joinMembers"></div>
+      <p class="dim" style="text-align:center">已加入，等待房主開始遊戲…</p>
+    </div>
+  </div>
+  <div class="err" id="lobbyErr"></div>
+  <div class="netnote" id="netNote">線上模式採點對點連線（PeerJS），不需要註冊帳號。遊戲由房主的瀏覽器負責運算，進行中請房主保持頁面開啟。</div>
+  <p class="dim" style="margin:10px 0 0">玩法機制致敬經典桌遊《矮人礦坑》，美術、模型、音效皆為原創。</p>
+</div></div>
+
+<div id="mStart" class="modal hide"><div class="mbox panel" style="text-align:center">
+  <h2>你的身分</h2>
+  <div class="rolecard" id="rc"><div class="in"><div class="f">?</div><div class="b" id="rcBack"></div></div></div>
+  <p id="roleText"></p>
+  <button class="primary" id="bGo">進入礦坑</button>
+</div></div>
+
+<div id="mEnd" class="modal hide"><div class="mbox panel" style="text-align:center">
+  <h2 id="endTitle"></h2><p id="endText"></p><div id="endRoles"></div>
+  <div class="row" style="justify-content:center;margin-top:14px;gap:10px">
+    <button class="primary" id="bAgain">再玩一局</button>
+    <button id="bEndClose">看看棋盤</button>
+    <button id="bToLobby">回大廳</button>
+  </div>
+  <p class="dim" id="endWait"></p>
+</div></div>
+
+<div id="mMsg" class="modal hide"><div class="mbox panel" style="text-align:center">
+  <h2 id="msgTitle"></h2><p id="msgText"></p><button class="primary" id="bMsgOk">回大廳</button>
+</div></div>
+
+<div id="mRules" class="modal hide"><div class="mbox panel">
+  <h2>規則速覽</h2>
+  <ol>
+    <li><b>身分</b>：從 5 張身分卡（4 淘金者、1 搗蛋鬼）中每人抽 1 張，剩 1 張不公開，所以這局<b>可能沒有搗蛋鬼</b>。</li>
+    <li><b>目標</b>：淘金者要從起點挖出連續通道通到金脈；搗蛋鬼要撐到牌全部用完都沒人挖到。</li>
+    <li><b>回合</b>：打出一張牌或棄一張牌，然後補一張。</li>
+    <li><b>通道卡</b>：四邊必須和相鄰卡片吻合，而且要連回起點。可旋轉 180°。中間被碎石堵住的是<b>死路卡</b>。</li>
+    <li><b>損壞卡</b>（⛏ 鎬／🏮 燈／🛒 礦車）：打在別人身上，工具壞了就不能放通道卡。</li>
+    <li><b>修理卡</b>：修好自己或別人對應的工具。</li>
+    <li><b>落石卡</b> 💥：炸掉一張通道卡（起點、終點除外）。</li>
+    <li><b>地圖卡</b> 🗺：偷看一張終點卡，只有你知道結果。</li>
+    <li>通道接上終點卡就翻開；翻到金脈，淘金者立即獲勝。</li>
+  </ol>
+  <p class="dim">操作：拖曳旋轉視角、滾輪／雙指縮放、右鍵平移。選通道卡後，綠框是可放的位置，按 R 或「旋轉」換方向。</p>
+  <div style="text-align:right"><button class="primary" id="bRulesClose">知道了</button></div>
+</div></div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const VERSION='dv-2';
+const $=id=>document.getElementById(id);
+const QS=new URLSearchParams(location.search);
+
+/* =========================================================
+   RULES (pure functions on a board Map)
+   ========================================================= */
+const DIRS=[[0,1],[1,0],[0,-1],[-1,0]]; // N E S W
+const BOUNDS={x0:-4,x1:12,y0:-5,y1:5};
+const GOALS=[[8,2],[8,0],[8,-2]];
+const TOOLS={pick:'⛏',lamp:'🏮',cart:'🛒'};
+const TOOLNAME={pick:'鎬',lamp:'礦燈',cart:'礦車'};
+const TOOLMODEL={pick:'Pickaxe',lamp:'Lantern',cart:'Cart'};
+const K=(x,y)=>x+','+y;
+const XY=k=>k.split(',').map(Number);
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const rotEdges=(e,r)=>r?[e[2],e[3],e[0],e[1]]:e.slice();
+const inB=(x,y)=>x>=BOUNDS.x0&&x<=BOUNDS.x1&&y>=BOUNDS.y0&&y<=BOUNDS.y1;
+const isBroken=b=>b.pick||b.lamp||b.cart;
+
+function buildDeck(){
+  const d=[];let id=0;
+  const P=(n,e,s,w,conn,c)=>{for(let i=0;i<c;i++)d.push({id:id++,type:'path',edges:[!!n,!!e,!!s,!!w],conn:!!conn})};
+  P(1,0,1,0,1,4);P(0,1,0,1,1,3);P(1,1,0,0,1,5);P(1,0,0,1,1,4);P(1,1,1,0,1,5);P(1,1,0,1,1,5);P(1,1,1,1,1,5);
+  [[1,0,0,0],[0,1,0,0],[1,0,1,0],[0,1,0,1],[1,1,0,0],[1,0,0,1],[1,1,0,1],[1,1,1,0],[1,1,1,1]].forEach(e=>P(...e,0,1));
+  for(const t of ['pick','lamp','cart'])for(let i=0;i<3;i++)d.push({id:id++,type:'break',tool:t});
+  for(const t of ['pick','lamp','cart'])for(let i=0;i<2;i++)d.push({id:id++,type:'fix',tools:[t]});
+  [['pick','lamp'],['pick','cart'],['lamp','cart']].forEach(ts=>d.push({id:id++,type:'fix',tools:ts}));
+  for(let i=0;i<3;i++)d.push({id:id++,type:'rockfall'});
+  for(let i=0;i<6;i++)d.push({id:id++,type:'map'});
+  return shuffle(d);
+}
+function reachOf(board){
+  const seen=new Set(['0,0']),touched=new Set(),q=[[0,0]];
+  while(q.length){const [x,y]=q.shift(),c=board.get(K(x,y));
+    for(let d=0;d<4;d++){if(!c.edges[d])continue;
+      const nx=x+DIRS[d][0],ny=y+DIRS[d][1],k=K(nx,ny),n=board.get(k);
+      if(!n||!n.edges[(d+2)%4])continue;
+      if(n.kind==='goal'&&!n.revealed){touched.add(k);continue}
+      if(!n.conn||seen.has(k))continue;
+      seen.add(k);q.push([nx,ny]);}}
+  return {seen,touched};
+}
+function canPlaceOn(board,edges,x,y,R){
+  if(!inB(x,y)||board.get(K(x,y)))return false;
+  let linked=false,hasN=false;
+  for(let d=0;d<4;d++){const nx=x+DIRS[d][0],ny=y+DIRS[d][1],n=board.get(K(nx,ny));
+    if(!n||(n.kind==='goal'&&!n.revealed))continue;
+    hasN=true; if(edges[d]!==n.edges[(d+2)%4])return false;
+    if(edges[d]&&R.seen.has(K(nx,ny)))linked=true;}
+  return hasN&&linked;
+}
+function candidatesOf(board){
+  const s=new Set();
+  for(const k of board.keys()){const [x,y]=XY(k);
+    for(const [dx,dy] of DIRS){const nx=x+dx,ny=y+dy;if(inB(nx,ny)&&!board.get(K(nx,ny)))s.add(K(nx,ny))}}
+  return [...s].map(XY);
+}
+function placementsOf(board,card,onlyRot){
+  const R=reachOf(board),out=[];
+  for(const r of (onlyRot===undefined?[false,true]:[onlyRot])){const e=rotEdges(card.edges,r);
+    if(onlyRot===undefined&&r&&e.every((v,i)=>v===card.edges[i]))continue;
+    for(const [x,y] of candidatesOf(board))if(canPlaceOn(board,e,x,y,R))out.push({x,y,rot:r});}
+  return out;
+}
+function frontierDistOf(board,targets,R=reachOf(board)){
+  for(const [tx,ty] of targets)if(R.touched.has(K(tx,ty)))return -5;
+  let best=99,cnt=0;
+  for(const k of R.seen){const [x,y]=XY(k),c=board.get(k);
+    for(let d=0;d<4;d++){if(!c.edges[d])continue;const nx=x+DIRS[d][0],ny=y+DIRS[d][1];
+      if(!inB(nx,ny)||board.get(K(nx,ny)))continue;
+      for(const [tx,ty] of targets){const dd=Math.abs(nx-tx)+Math.abs(ny-ty);if(dd<best){best=dd;cnt=1}else if(dd===best)cnt++}}}
+  return best-Math.min(cnt,5)*.1;
+}
+
+/* =========================================================
+   ENGINE — runs on the host (or locally in solo mode)
+   ========================================================= */
+const AINAMES=['阿岩','老鐵','小煤','石頭','老金'];
+const wait=ms=>new Promise(r=>setTimeout(r,FAST.test?0:ms*(FAST.on?.3:1)));
+class Engine{
+  constructor(seats,localPid){this.seats=seats;this.localPid=localPid;this.reset()}
+  reset(){
+    this.board=new Map();this.deck=buildDeck();this.over=false;this.winner=null;this.awaiting=-1;this.goldCell=null;
+    this.turn=Math.floor(Math.random()*4);
+    const roles=shuffle(['S','D','D','D','D']).slice(0,4);
+    this.players=this.seats.map((s,i)=>({id:i,name:s.name,ctrl:s.ctrl,conn:s.conn||null,wasRemote:s.ctrl==='remote',role:roles[i],hand:[],
+      broken:{pick:false,lamp:false,cart:false},known:{},sus:[0,0,0,0],pending:null}));
+    for(const p of this.players)for(let i=0;i<6;i++)p.hand.push(this.deck.pop());
+    this.board.set(K(0,0),{kind:'start',edges:[true,true,true,true],conn:true});
+    const gi=Math.floor(Math.random()*3);
+    GOALS.forEach(([x,y],i)=>this.board.set(K(x,y),{kind:'goal',edges:[true,true,true,true],conn:true,goal:i===gi?'gold':'coal',revealed:false}));
+  }
+  boardPublic(){return [...this.board].map(([k,c])=>({k,kind:c.kind,edges:c.edges,conn:c.conn,revealed:!!c.revealed,goal:c.revealed?c.goal:undefined}))}
+  syncFor(pid,full,newGame){const p=this.players[pid];
+    return {full:!!full,newGame:!!newGame,me:pid,deck:this.deck.length,turn:this.turn,awaiting:this.awaiting,over:this.over,
+      players:this.players.map(q=>({id:q.id,name:q.name,ctrl:q.ctrl,n:q.hand.length,broken:{...q.broken}})),
+      hand:p?p.hand:[],role:p?p.role:null,known:p?{...p.known}:{},board:full?this.boardPublic():null}}
+  evFor(pid,e){if(e.t==='map'&&e.pid!==pid){const {result,...r}=e;return r}return e}
+  remotes(){return this.players.filter(p=>p.ctrl==='remote'&&p.conn&&p.conn.open)}
+  async broadcast(evts){
+    for(const p of this.remotes())safeSend(p.conn,{type:'events',evts:evts.map(e=>this.evFor(p.id,e))});
+    if(this.localPid>=0)await VIEW.enqueueEvents(evts.map(e=>this.evFor(this.localPid,e)));
+  }
+  sendSync(full=false,newGame=false){
+    for(const p of this.remotes())safeSend(p.conn,{type:'sync',s:this.syncFor(p.id,full,newGame)});
+    if(this.localPid>=0)return VIEW.enqueueSync(this.syncFor(this.localPid,full,newGame));
+  }
+  allEmpty(){return this.players.every(p=>!p.hand.length)}
+  pubDist(){const h=GOALS.filter(([x,y])=>!this.board.get(K(x,y)).revealed);return frontierDistOf(this.board,h.length?h:GOALS)}
+  async run(){
+    this.running=true;
+    while(!this.over&&!this.stopped){
+      const p=this.players[this.turn];
+      if(!p.hand.length){ if(this.allEmpty()){const ev=[];this.finish('S',ev);await this.broadcast(ev);break}
+        this.turn=(this.turn+1)%4;continue;}
+      this.awaiting=p.id;this.sendSync();
+      const a=await this.getAction(p);
+      if(this.stopped)return;
+      this.awaiting=-1;
+      const evts=this.apply(p,a);
+      if(!this.over&&this.deck.length)p.hand.push(this.deck.pop());
+      if(!this.over&&this.allEmpty())this.finish('S',evts);
+      if(!this.over)this.turn=(this.turn+1)%4;
+      await this.broadcast(evts);
+    }
+    this.awaiting=-1;this.sendSync();
+  }
+  async getAction(p){
+    if(p.ctrl==='ai'){await wait(750);return aiDecide(this,p)}
+    return new Promise(res=>{p.pending=res});
+  }
+  receive(pid,raw){
+    const p=this.players[pid];if(!p||!p.pending||this.turn!==pid||this.over)return;
+    const a=this.resolve(p,raw);
+    if(!a){const s=this.syncFor(pid);if(pid===this.localPid)VIEW.enqueueSync(s);else safeSend(p.conn,{type:'sync',s});return}
+    const r=p.pending;p.pending=null;r(a);
+  }
+  resolve(p,raw){ // validate a serialized action from a player
+    const card=p.hand.find(c=>c.id===raw.cardId);if(!card)return null;
+    const a={kind:raw.kind,card};
+    if(raw.kind==='discard')return a;
+    if(raw.kind==='path'){if(card.type!=='path'||isBroken(p.broken))return null;
+      const e=rotEdges(card.edges,!!raw.rot);if(!canPlaceOn(this.board,e,raw.x,raw.y,reachOf(this.board)))return null;
+      return {...a,x:raw.x,y:raw.y,rot:!!raw.rot}}
+    if(raw.kind==='rockfall'){const c=this.board.get(K(raw.x,raw.y));if(card.type!=='rockfall'||!c||c.kind!=='path')return null;return {...a,x:raw.x,y:raw.y}}
+    if(raw.kind==='map'){const c=this.board.get(K(raw.x,raw.y));if(card.type!=='map'||!c||c.kind!=='goal'||c.revealed)return null;return {...a,x:raw.x,y:raw.y}}
+    const t=this.players[raw.target];if(!t)return null;
+    if(raw.kind==='break'){if(card.type!=='break'||t===p||t.broken[card.tool])return null;return {...a,target:t}}
+    if(raw.kind==='fix'){if(card.type!=='fix'||!card.tools.includes(raw.tool)||!t.broken[raw.tool])return null;return {...a,target:t,tool:raw.tool}}
+    return null;
+  }
+  apply(p,a){
+    const ev=[],before=this.pubDist();
+    p.hand.splice(p.hand.indexOf(a.card),1);
+    if(a.kind==='path'){const e=rotEdges(a.card.edges,a.rot);
+      this.board.set(K(a.x,a.y),{kind:'path',edges:e,conn:a.card.conn});
+      ev.push({t:'path',pid:p.id,x:a.x,y:a.y,edges:e,conn:a.card.conn});
+      this.revealLoop(p,ev);
+    }else if(a.kind==='rockfall'){this.board.delete(K(a.x,a.y));ev.push({t:'rockfall',pid:p.id,x:a.x,y:a.y})}
+    else if(a.kind==='break'){a.target.broken[a.card.tool]=true;ev.push({t:'break',pid:p.id,target:a.target.id,tool:a.card.tool})}
+    else if(a.kind==='fix'){a.target.broken[a.tool]=false;ev.push({t:'fix',pid:p.id,target:a.target.id,tool:a.tool})}
+    else if(a.kind==='map'){const c=this.board.get(K(a.x,a.y));p.known[K(a.x,a.y)]=c.goal;ev.push({t:'map',pid:p.id,x:a.x,y:a.y,result:c.goal})}
+    else ev.push({t:'discard',pid:p.id});
+    observe(this,p,a,before,this.pubDist());
+    return ev;
+  }
+  revealLoop(p,ev){
+    let again=true;
+    while(again&&!this.over){again=false;
+      for(const k of reachOf(this.board).touched){const c=this.board.get(k);if(c.revealed)continue;
+        c.revealed=true;again=true;const [x,y]=XY(k);ev.push({t:'reveal',pid:p.id,x,y,goal:c.goal});
+        if(c.goal==='gold'){this.goldCell=k;this.finish('D',ev);return}
+        for(const q of this.players)q.known[k]='coal';}}
+  }
+  finish(w,ev){
+    this.over=true;this.winner=w;this.awaiting=-1;
+    ev.push({t:'end',winner:w,roles:this.players.map(p=>p.role),goals:GOALS.map(([x,y])=>({x,y,goal:this.board.get(K(x,y)).goal})),path:w==='D'?this.pathToGold():null});
+  }
+  pathToGold(){
+    const [gx,gy]=XY(this.goldCell),prev=new Map([['0,0',null]]),q=[[0,0]];
+    while(q.length){const [x,y]=q.shift(),c=this.board.get(K(x,y));if(x===gx&&y===gy)break;
+      for(let d=0;d<4;d++){if(!c.edges[d])continue;const nx=x+DIRS[d][0],ny=y+DIRS[d][1],k=K(nx,ny),n=this.board.get(k);
+        if(!n||!n.edges[(d+2)%4]||prev.has(k))continue;if(!n.conn&&k!==this.goldCell)continue;prev.set(k,K(x,y));q.push([nx,ny])}}
+    const path=[];let k=this.goldCell;while(k){path.unshift(XY(k));k=prev.get(k)}return path;
+  }
+  dropToAI(pid,reason){
+    const p=this.players[pid];if(!p||p.ctrl==='ai')return;
+    p.ctrl='ai';p.conn=null;
+    this.broadcast([{t:'log',msg:`<b>${esc(p.name)}</b> ${reason}，暫由 AI 代打`}]);
+    this.sendSync();
+    if(p.pending){const r=p.pending;p.pending=null;r(aiDecide(this,p))}
+  }
+  stop(){this.stopped=true;for(const p of this.players)if(p.pending){p.pending=null}}
+}
+function targetsFor(E,p){
+  const hidden=GOALS.filter(([x,y])=>!E.board.get(K(x,y)).revealed);
+  for(const [x,y] of hidden)if(p.known[K(x,y)]==='gold')return [[x,y]];
+  const t=hidden.filter(([x,y])=>p.known[K(x,y)]!=='coal');
+  return t.length?t:(hidden.length?hidden:GOALS);
+}
+function aiDecide(E,p){
+  const sab=p.role==='S',hand=p.hand,others=E.players.filter(q=>q!==p),B=E.board;
+  const targets=targetsFor(E,p),cur=frontierDistOf(B,targets),sus=p.sus,opts=[];
+  for(const c of hand)if(c.type==='fix'){const t=c.tools.find(t=>p.broken[t]);if(t)opts.push({s:100,a:{kind:'fix',card:c,target:p,tool:t}})}
+  if(!isBroken(p.broken))for(const c of hand)if(c.type==='path'){
+    for(const pl of placementsOf(B,c)){const e=rotEdges(c.edges,pl.rot);
+      const b2=new Map(B);b2.set(K(pl.x,pl.y),{kind:'path',edges:e,conn:c.conn});const nd=frontierDistOf(b2,targets);let s;
+      if(!sab){if(!c.conn)continue;s=(cur-nd)*20+(nd<cur?40:0)-(nd>=cur?60:0)+Math.random()*12-(Math.random()<.4?70:0)}
+      else{s=(nd-cur)*25+(c.conn?0:30)-(nd<=cur?80:0)+Math.random()*3;if(s<0&&nd>=cur-.05)s=8+Math.random()*4}
+      opts.push({s,a:{kind:'path',card:c,...pl}});}}
+  const unk=GOALS.filter(([x,y])=>!B.get(K(x,y)).revealed&&!p.known[K(x,y)]);
+  const goldKnown=targets.length===1&&p.known[K(...targets[0])]==='gold';
+  if(!goldKnown&&unk.length>1)for(const c of hand)if(c.type==='map'){const side=unk.filter(([x,y])=>y!==0);const g=rnd(side.length?side:unk);
+    opts.push({s:sab?30:(cur<=4?65:35),a:{kind:'map',card:c,x:g[0],y:g[1]}});break}
+  for(const c of hand)if(c.type==='rockfall'){
+    for(const [k,v] of B)if(v.kind==='path'){const [x,y]=XY(k);const b2=new Map(B);b2.delete(k);const nd=frontierDistOf(b2,targets);
+      const s=sab?(nd-cur)*25-(nd<=cur?100:0)+(cur<=3?45:0):(cur-nd)*30+(!v.conn?15:0)-(nd>=cur?100:0);
+      opts.push({s,a:{kind:'rockfall',card:c,x,y}})}break}
+  for(const c of hand)if(c.type==='break')for(const q of others)if(!q.broken[c.tool]){
+    const s=!sab?(sus[q.id]>=3?45+sus[q.id]*5:-50):40+(cur<=5?35:0)-sus[q.id]*5+Math.random()*10;
+    opts.push({s,a:{kind:'break',card:c,target:q}})}
+  for(const c of hand)if(c.type==='fix')for(const q of others){const t=c.tools.find(t=>q.broken[t]);if(!t)continue;
+    opts.push({s:sab?-40:(sus[q.id]<=-1?50-sus[q.id]*5:-30),a:{kind:'fix',card:c,target:q,tool:t}})}
+  opts.sort((a,b)=>b.s-a.s);
+  if(opts.length&&opts[0].s>0)return opts[0].a;
+  const val=c=>c.type==='path'?(sab?(c.conn?1:6):(c.conn?5:0)):c.type==='fix'?(sab?0:4):c.type==='break'?(sab?6:3):c.type==='map'?(goldKnown?0:4):3;
+  return {kind:'discard',card:[...hand].sort((a,b)=>val(a)-val(b))[0]};
+}
+function observe(E,actor,a,before,after){
+  for(const ob of E.players){if(ob===actor)continue;const s=ob.sus;
+    if(a.kind==='path'||a.kind==='rockfall'){const d=after-before;if(d>0)s[actor.id]+=2;else if(d<0)s[actor.id]-=1;if(a.kind==='path'&&!a.card.conn)s[actor.id]+=1}
+    if(a.kind==='break'){if(a.target===ob)s[actor.id]+=ob.role==='D'?2:-1;else if(s[a.target.id]>=2)s[actor.id]-=1;else s[actor.id]+=1}
+    if(a.kind==='fix'&&a.target!==actor){if(s[a.target.id]>=2)s[actor.id]+=1;else s[actor.id]-=1}}
+}
+
+/* =========================================================
+   AUDIO — background music + synthesized SFX
+   ========================================================= */
+const bgm=new Audio('assets/the_glass_orchard.mp3');bgm.loop=true;bgm.preload='auto';
+const AUD={music:true,sfx:true,musicVol:.32};
+try{const s=JSON.parse(localStorage.getItem('dv-audio')||'{}');Object.assign(AUD,s)}catch(e){}
+function saveAud(){try{localStorage.setItem('dv-audio',JSON.stringify({music:AUD.music,sfx:AUD.sfx}))}catch(e){}}
+bgm.volume=AUD.musicVol;
+function startMusic(){SFX.init();if(AUD.music&&!FAST.test){bgm.play().catch(()=>{})}}
+let duckT=null;
+function duck(ms=2500){if(!AUD.music)return;bgm.volume=AUD.musicVol*.3;clearTimeout(duckT);duckT=setTimeout(()=>bgm.volume=AUD.musicVol,ms)}
+const SFX={ctx:null,
+  init(){if(this.ctx)return;const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
+    this.ctx=new C();this.master=this.ctx.createGain();this.master.gain.value=.7;
+    const comp=this.ctx.createDynamicsCompressor();this.master.connect(comp);comp.connect(this.ctx.destination);
+    const len=this.ctx.sampleRate*2;this.nb=this.ctx.createBuffer(1,len,this.ctx.sampleRate);const d=this.nb.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;},
+  tone(f,dur,o={}){const c=this.ctx,os=c.createOscillator(),g=c.createGain(),t0=c.currentTime+(o.t||0);
+    os.type=o.type||'sine';os.frequency.setValueAtTime(f,t0);if(o.slide)os.frequency.exponentialRampToValueAtTime(o.slide,t0+dur);
+    g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(o.vol??.2,t0+(o.a||.005));g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+    os.connect(g);g.connect(this.master);os.start(t0);os.stop(t0+dur+.05)},
+  noise(dur,o={}){const c=this.ctx,s=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain(),t0=c.currentTime+(o.t||0);
+    s.buffer=this.nb;f.type=o.type||'lowpass';f.frequency.setValueAtTime(o.f||1000,t0);if(o.slide)f.frequency.exponentialRampToValueAtTime(o.slide,t0+dur);f.Q.value=o.q||1;
+    g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(o.vol??.2,t0+(o.a||.005));g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+    s.connect(f);f.connect(g);g.connect(this.master);s.start(t0,Math.random());s.stop(t0+dur+.05)},
+  play(n){if(!AUD.sfx||!this.ctx||FAST.test)return;if(this.ctx.state==='suspended')this.ctx.resume();try{SOUNDS[n]&&SOUNDS[n](this)}catch(e){}}
+};
+const SOUNDS={
+  select:s=>s.tone(880,.07,{type:'triangle',vol:.1}),
+  rotate:s=>{s.tone(520,.05,{type:'square',vol:.05});s.tone(780,.06,{type:'square',vol:.05,t:.045})},
+  whoosh:s=>s.noise(.4,{type:'bandpass',f:350,slide:2600,vol:.14,a:.18,q:1.5}),
+  place:s=>{s.tone(120,.28,{slide:48,vol:.45});s.noise(.3,{f:900,slide:180,vol:.3});for(let i=0;i<6;i++)s.noise(.04,{type:'highpass',f:2500+Math.random()*2000,vol:.06,t:.05+i*.035})},
+  dead:s=>{SOUNDS.place(s);s.tone(78,.5,{type:'sawtooth',vol:.08,slide:38,t:.05});s.noise(.4,{f:400,slide:90,vol:.25,t:.08})},
+  shake:s=>{s.noise(.5,{f:140,vol:.35,a:.25});s.tone(45,.5,{vol:.25,a:.2})},
+  rockfall:s=>{s.noise(1.6,{f:420,slide:55,vol:.8});s.tone(58,1.3,{slide:28,vol:.6});s.noise(.6,{f:3500,slide:400,vol:.25,t:.03});
+    for(let i=0;i<14;i++)s.noise(.05,{type:'bandpass',f:800+Math.random()*2500,q:3,vol:.12,t:.15+Math.random()*1})},
+  clank:s=>{[523,1231,1867,2649].forEach((f,i)=>s.tone(f,.6-i*.1,{type:'triangle',vol:.1}));s.noise(.08,{type:'highpass',f:4000,vol:.3});
+    s.tone(320,.45,{type:'sawtooth',slide:110,vol:.05,t:.12})},
+  fix:s=>{[523,659,784,1047].forEach((f,i)=>s.tone(f,.3,{type:'triangle',vol:.12,t:i*.07}));for(let i=0;i<5;i++)s.tone(2400+Math.random()*1600,.12,{vol:.03,t:.25+i*.04})},
+  map:s=>{for(let i=0;i<5;i++)s.noise(.11,{type:'bandpass',f:2000+Math.random()*2500,q:.8,vol:.13,t:i*.07})},
+  lift:s=>s.noise(.7,{type:'bandpass',f:500,slide:1300,q:2.5,vol:.22,a:.15}),
+  peek:s=>{s.tone(1100,.6,{vol:.08,slide:1700});s.tone(1650,.5,{vol:.05,t:.1,slide:2400})},
+  gold:s=>{[523,659,784,1047,1319].forEach((f,i)=>{s.tone(f,.45,{type:'triangle',vol:.14,t:i*.09});s.tone(f/2,.45,{type:'square',vol:.025,t:i*.09})});
+    s.tone(1047,1.4,{type:'triangle',vol:.12,t:.5});s.tone(1568,1.4,{type:'sine',vol:.06,t:.5});
+    for(let i=0;i<14;i++)s.tone(2000+Math.random()*2500,.18,{vol:.035,t:.4+i*.06})},
+  coal:s=>{s.tone(95,.6,{slide:42,vol:.4});s.noise(.7,{f:600,slide:100,vol:.3});for(let i=0;i<8;i++)s.noise(.03,{type:'highpass',f:3000,vol:.05,t:.1+Math.random()*.5})},
+  discard:s=>s.noise(.28,{type:'bandpass',f:1600,slide:450,vol:.12,a:.06}),
+  turn:s=>{s.tone(988,.9,{vol:.11});s.tone(1976,.6,{vol:.04});s.tone(1319,.9,{vol:.07,t:.13})},
+  cart:s=>{s.tone(150+Math.random()*25,.09,{type:'square',vol:.035});s.noise(.12,{f:700,vol:.08});s.noise(.03,{type:'highpass',f:5000,vol:.07,t:.07})},
+  win:s=>[523,659,784,659,784,1047].forEach((f,i)=>{s.tone(f,.32,{type:'triangle',vol:.14,t:i*.14});s.tone(f*2,.2,{vol:.03,t:i*.14})}),
+  lose:s=>[392,370,330,262].forEach((f,i)=>s.tone(f,.5,{type:'triangle',vol:.13,t:i*.24})),
+  join:s=>{s.tone(660,.12,{type:'triangle',vol:.12});s.tone(990,.18,{type:'triangle',vol:.12,t:.09})},
+  error:s=>s.tone(190,.18,{type:'square',vol:.07}),
+};
+function refreshAudBtns(){$('bMusic').classList.toggle('off',!AUD.music);$('bSfx').classList.toggle('off',!AUD.sfx)}
+$('bMusic').onclick=()=>{AUD.music=!AUD.music;saveAud();refreshAudBtns();SFX.init();if(AUD.music)bgm.play().catch(()=>{});else bgm.pause()};
+$('bSfx').onclick=()=>{AUD.sfx=!AUD.sfx;saveAud();refreshAudBtns();SFX.init();SFX.play('select')};
+refreshAudBtns();
+
+/* =========================================================
+   THREE.JS SCENE
+   ========================================================= */
+const FAST={on:false,test:false};
+const S=1.04;
+const W=(x,y)=>new THREE.Vector3(x*S,0,-y*S);
+const canvas=$('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x0e0907);scene.fog=new THREE.Fog(0x0e0907,18,40);
+const camera=new THREE.PerspectiveCamera(45,1,.1,100);
+const CAM0={pos:new THREE.Vector3(4,10.5,8.2),tgt:new THREE.Vector3(4,0,-1.6)};
+camera.position.copy(CAM0.pos);
+const controls=new OrbitControls(camera,canvas);
+controls.target.copy(CAM0.tgt);controls.enableDamping=true;controls.maxPolarAngle=1.35;controls.minDistance=5;controls.maxDistance=26;
+scene.add(new THREE.HemisphereLight(0xffe2b8,0x1a1008,.9));
+const sun=new THREE.DirectionalLight(0xffd9a0,1.6);sun.position.set(-4,14,8);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-14,right:20,top:14,bottom:-14,near:1,far:45});
+sun.target.position.set(4,0,0);scene.add(sun,sun.target);
+const startLight=new THREE.PointLight(0xffb060,6,6,1.6);startLight.position.set(0,1.2,0);scene.add(startLight);
+function rockTexture(){const cv=document.createElement('canvas');cv.width=cv.height=512;const g=cv.getContext('2d');
+  g.fillStyle='#1e1611';g.fillRect(0,0,512,512);
+  for(let i=0;i<1600;i++){const v=14+Math.random()*22;g.fillStyle=`rgba(${v+22},${v+14},${v},${Math.random()*.35})`;const r=2+Math.random()*12;g.beginPath();g.arc(Math.random()*512,Math.random()*512,r,0,7);g.fill()}
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(8,8);t.colorSpace=THREE.SRGBColorSpace;return t}
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(60,60),new THREE.MeshStandardMaterial({map:rockTexture(),roughness:1}));
+ground.rotation.x=-Math.PI/2;ground.position.set(4,-.01,0);ground.receiveShadow=true;scene.add(ground);
+{const w=(BOUNDS.x1-BOUNDS.x0+1)*S,h=(BOUNDS.y1-BOUNDS.y0+1)*S,cx=(BOUNDS.x0+BOUNDS.x1)/2*S,cz=-(BOUNDS.y0+BOUNDS.y1)/2*S,pts=[];
+  for(let x=BOUNDS.x0;x<=BOUNDS.x1+1;x++){const X=(x-.5)*S;pts.push(X,.005,cz-h/2,X,.005,cz+h/2)}
+  for(let y=BOUNDS.y0;y<=BOUNDS.y1+1;y++){const Z=-(y-.5)*S;pts.push(cx-w/2,.005,Z,cx+w/2,.005,Z)}
+  const gg=new THREE.BufferGeometry();gg.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
+  scene.add(new THREE.LineSegments(gg,new THREE.LineBasicMaterial({color:0x6b5038,transparent:true,opacity:.28})))}
+const dust=new THREE.Points((()=>{const g=new THREE.BufferGeometry(),a=[];for(let i=0;i<500;i++)a.push(-8+Math.random()*24,Math.random()*6,-9+Math.random()*18);g.setAttribute('position',new THREE.Float32BufferAttribute(a,3));return g})(),
+  new THREE.PointsMaterial({color:0xffd59a,size:.04,transparent:true,opacity:.5,depthWrite:false}));
+scene.add(dust);
+
+const ASSETS={};
+async function loadAssets(){
+  const buf=await (await fetch('assets/deepvein_assets.glb')).arrayBuffer();
+  const gltf=await new GLTFLoader().parseAsync(buf,'');
+  gltf.scene.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
+  for(const o of gltf.scene.children)ASSETS[o.name]=o;
+}
+function asset(name,fb){const a=ASSETS[name];if(!a)return fb();const m=a.clone();m.position.set(0,0,0);m.rotation.set(0,0,0);m.scale.set(1,1,1);return m}
+const fbBox=(c,s=.3)=>()=>{const m=new THREE.Mesh(new THREE.BoxGeometry(s,s,s),new THREE.MeshStandardMaterial({color:c}));m.castShadow=true;return m};
+
+const GEO={base:new THREE.BoxGeometry(.98,.12,.98),block:new THREE.BoxGeometry(1/3,1,1/3),floor:new THREE.PlaneGeometry(1/3,1/3),
+  rail:new THREE.BoxGeometry(.03,.03,.5),sleeper:new THREE.BoxGeometry(.22,.025,.05),plane:new THREE.PlaneGeometry(.96,.96)};
+const MAT={base:new THREE.MeshStandardMaterial({color:0x4a3626,roughness:1}),
+  rocks:[0x6a5644,0x5d4b3b,0x77624e,0x544336].map(c=>new THREE.MeshStandardMaterial({color:c,roughness:.95,flatShading:true})),
+  floor:new THREE.MeshStandardMaterial({color:0xb08a5a,roughness:.9,emissive:0x5a3410,emissiveIntensity:.8}),
+  rubble:new THREE.MeshStandardMaterial({color:0x3a2e26,roughness:1,flatShading:true}),
+  rail:new THREE.MeshStandardMaterial({color:0x9aa0a6,metalness:.8,roughness:.35}),
+  sleeper:new THREE.MeshStandardMaterial({color:0x5b3a1e,roughness:.9}),
+  ok:new THREE.MeshBasicMaterial({color:0x5fd47a,transparent:true,opacity:.28,depthWrite:false}),
+  bad:new THREE.MeshBasicMaterial({color:0xff5a4a,transparent:true,opacity:.35,depthWrite:false}),
+  peek:new THREE.MeshBasicMaterial({color:0x4fb4ff,transparent:true,opacity:.35,depthWrite:false})};
+function buildTile(edges,conn){
+  const g=new THREE.Group();
+  const base=new THREE.Mesh(GEO.base,MAT.base);base.position.y=.06;base.receiveShadow=true;base.castShadow=true;g.add(base);
+  const open=(i,j)=>(i===0&&j===0)?true:(i===0&&j===1)?edges[0]:(i===1&&j===0)?edges[1]:(i===0&&j===-1)?edges[2]:(i===-1&&j===0)?edges[3]:false;
+  for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const x=i/3,z=-j/3;
+    if(open(i,j)&&!(i===0&&j===0&&!conn)){const f=new THREE.Mesh(GEO.floor,MAT.floor);f.rotation.x=-Math.PI/2;f.position.set(x,.121,z);f.receiveShadow=true;g.add(f)}
+    else if(i===0&&j===0&&!conn){for(let r=0;r<4;r++){const b=new THREE.Mesh(GEO.block,MAT.rubble),s=.35+Math.random()*.25;b.scale.set(s,.16+Math.random()*.1,s);
+      b.position.set(x+(Math.random()-.5)*.14,.16,z+(Math.random()-.5)*.14);b.rotation.y=Math.random()*3;b.castShadow=true;g.add(b)}}
+    else{const h=.26+Math.random()*.12,b=new THREE.Mesh(GEO.block,rnd(MAT.rocks));b.scale.set(1,h,1);b.position.set(x,.12+h/2,z);b.castShadow=true;b.receiveShadow=true;g.add(b)}}
+  if(conn)for(let d=0;d<4;d++)if(edges[d]){const rg=new THREE.Group();rg.rotation.y=[0,-Math.PI/2,Math.PI,Math.PI/2][d];
+    for(const off of[-.07,.07]){const r=new THREE.Mesh(GEO.rail,MAT.rail);r.position.set(off,.14,-.25);rg.add(r)}
+    for(const zz of[-.12,-.3,-.46]){const s=new THREE.Mesh(GEO.sleeper,MAT.sleeper);s.position.set(0,.13,zz);rg.add(s)}g.add(rg)}
+  return g;
+}
+function qTexture(){const cv=document.createElement('canvas');cv.width=cv.height=128;const c=cv.getContext('2d');
+  c.fillStyle='#3a3530';c.fillRect(0,0,128,128);c.strokeStyle='#8c7a5c';c.lineWidth=6;c.strokeRect(8,8,112,112);
+  c.fillStyle='#d8b878';c.font='900 80px "Noto Sans TC",sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText('?',64,70);
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;return t}
+const QTEX=qTexture();
+function makeLabel(text,color='#fff',size=48){
+  const cv=document.createElement('canvas'),c=cv.getContext('2d'),font=`900 ${size}px "Noto Sans TC",sans-serif`;c.font=font;
+  const w=Math.ceil(c.measureText(text).width)+28;cv.width=w;cv.height=size+24;c.font=font;c.fillStyle='rgba(20,12,6,.75)';
+  c.beginPath();c.roundRect(0,0,w,size+24,16);c.fill();c.fillStyle=color;c.textBaseline='middle';c.fillText(text,14,(size+24)/2+2);
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true}));s.scale.set(w/(size+24)*.32,.32,1);s.renderOrder=10;return s}
+
+const tweens=[],parts=[];
+const ease={out:k=>1-Math.pow(1-k,3),lin:k=>k};
+function tween(dur,fn,e=ease.out){return new Promise(res=>{if(FAST.test){fn(1);return res()}tweens.push({t:0,dur:dur*(FAST.on?.4:1),fn,e,res})})}
+const PGEO=new THREE.BoxGeometry(.06,.06,.06);
+function burst(pos,color,n=24,sp=2.5,up=2.5,life=1){if(FAST.test)return;
+  const m=new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.4,flatShading:true});
+  for(let i=0;i<n;i++){const p=new THREE.Mesh(PGEO,m);p.position.copy(pos);
+    p.userData={v:new THREE.Vector3((Math.random()-.5)*sp,Math.random()*up,(Math.random()-.5)*sp),life:life*(.6+Math.random()*.6),age:0};
+    const s=.6+Math.random()*1.4;p.scale.set(s,s,s);scene.add(p);parts.push(p)}}
+
+/* =========================================================
+   VIEW — what each device sees (public board + own secrets)
+   ========================================================= */
+const PCOL=['#3fa7ff','#e85d4a','#59c26a','#b07ce8'];
+const MINER_POS=[[.5,-7.3],[3.2,-7.3],[5.9,-7.3],[8.6,-7.3]];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const VIEW={me:0,board:new Map(),players:[],hand:[],role:null,known:{},turn:0,awaiting:-1,over:false,deck:0,chain:Promise.resolve(),busy:false,end:null,
+  enqueueEvents(evts){this.chain=this.chain.then(async()=>{this.busy=true;renderAll();for(const e of evts){try{await playEvent(e)}catch(err){console.error(err)}}this.busy=false;renderAll()});return this.chain},
+  enqueueSync(s){this.chain=this.chain.then(()=>applySync(s));return this.chain}};
+const pn=id=>{const p=VIEW.players[id];return p?`<b style="color:${PCOL[id]}">${esc(p.name)}${id===VIEW.me?'（你）':''}</b>`:'?'};
+function log(html){const d=document.createElement('div');d.innerHTML=html;$('log').prepend(d)}
+function toast(t,ms=1600){const e=$('toast');e.innerHTML=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),FAST.test?10:ms)}
+
+function clearScene(){
+  for(const c of VIEW.board.values())if(c.obj)scene.remove(c.obj);
+  for(const p of VIEW.players)if(p.m)scene.remove(p.m.g);
+  if(VIEW.cart){scene.remove(VIEW.cart);VIEW.cart=null}
+  clearHighlights();VIEW.board=new Map();
+}
+function cellObj(x,y,c){
+  const obj=buildTile(c.edges,c.conn);obj.position.copy(W(x,y));scene.add(obj);c.obj=obj;
+  if(c.kind==='start'){const l=asset('Lantern',fbBox(0xffcc66,.2));l.scale.setScalar(1.3);l.position.set(.3,.12,.3);obj.add(l)}
+  if(c.kind==='goal'){
+    if(!c.revealed){const cv=new THREE.Mesh(new THREE.BoxGeometry(.98,.5,.98),[...Array(6)].map((_,i)=>new THREE.MeshStandardMaterial({color:0x5a524a,roughness:.8,map:i===2?QTEX:null,transparent:true})));
+      cv.position.y=.37;cv.castShadow=true;obj.add(cv);c.cover=cv}
+    else addGoalModel(c)}
+  return obj;
+}
+function addGoalModel(c,dim){const g=asset(c.goal==='gold'?'Gold':'Coal',fbBox(c.goal==='gold'?0xffc23d:0x111111));g.scale.setScalar(c.goal==='gold'?1.6:1.4);g.position.y=.12;c.obj.add(g);
+  if(c.goal==='gold'&&!dim){const L=new THREE.PointLight(0xffc23d,8,5,1.5);L.position.y=.8;c.obj.add(L)}return g}
+function buildMiner(p){
+  const g=new THREE.Group();
+  const body=asset('Miner',()=>{const m=new THREE.Mesh(new THREE.CapsuleGeometry(.2,.4),new THREE.MeshStandardMaterial({color:PCOL[p.id]}));m.position.y=.4;return m});
+  const tint=m=>{if(m.name==='Tunic'){m=m.clone();m.color.set(PCOL[p.id])}return m};
+  body.traverse(o=>{if(o.isMesh)o.material=Array.isArray(o.material)?o.material.map(tint):tint(o.material)});g.add(body);
+  g.add(asset('MinerHelmetLamp',()=>new THREE.Group()));
+  const pk=asset('Pickaxe',fbBox(0x888888,.1));pk.scale.setScalar(.9);pk.position.set(.3,.05,.05);pk.rotation.z=-.4;g.add(pk);
+  const spot=new THREE.SpotLight(0xffe6b0,0,7,.5,.6,1.5);spot.position.set(0,.85,.15);spot.target.position.set(0,0,3);g.add(spot,spot.target);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.38,.48,40),new THREE.MeshBasicMaterial({color:PCOL[p.id],transparent:true,opacity:0,side:THREE.DoubleSide}));
+  ring.rotation.x=-Math.PI/2;ring.position.y=.02;g.add(ring);
+  const lbl=makeLabel(p.name+(p.id===VIEW.me?'（你）':''),PCOL[p.id]);lbl.position.set(0,1.35,0);g.add(lbl);
+  const icons=new THREE.Group();icons.position.y=1.75;g.add(icons);
+  const [mx,mz]=MINER_POS[p.id];g.position.set(mx,0,mz);g.scale.setScalar(1.25);scene.add(g);
+  p.m={g,body,spot,ring,icons,lbl,iconKey:''};
+}
+function refreshIcons(p){
+  const list=Object.keys(p.broken).filter(t=>p.broken[t]),key=list.join();if(p.m.iconKey===key)return;p.m.iconKey=key;
+  const ic=p.m.icons;while(ic.children.length)ic.remove(ic.children[0]);
+  list.forEach((t,i)=>{const o=asset(TOOLMODEL[t],fbBox(0xff4444,.2));o.scale.setScalar(t==='pick'?.55:t==='cart'?.5:.9);
+    o.traverse(m=>{if(m.isMesh){m.material=m.material.clone();m.material.emissive=new THREE.Color(0xff2a10);m.material.emissiveIntensity=.7}});
+    o.position.x=(i-(list.length-1)/2)*.45;ic.add(o)});
+}
+function applySync(s){
+  if(s.full){clearScene();
+    for(const p of VIEW.players)if(p.m)scene.remove(p.m.g);
+    VIEW.me=s.me;VIEW.players=s.players.map(p=>({...p}));
+    for(const c of s.board){const [x,y]=XY(c.k);const cc={...c};VIEW.board.set(c.k,cc);cellObj(x,y,cc)}
+    VIEW.players.forEach(buildMiner);
+    if(s.newGame){$('log').innerHTML='';log('新的一局開始。');VIEW.end=null;$('mEnd').classList.add('hide');}
+  }else{
+    s.players.forEach((p,i)=>{const v=VIEW.players[i];if(v){v.name=p.name;v.ctrl=p.ctrl;v.n=p.n;v.broken=p.broken}});
+  }
+  const wasMine=VIEW.awaiting===VIEW.me&&!VIEW.over;
+  Object.assign(VIEW,{me:s.me,hand:s.hand,role:s.role,known:s.known,turn:s.turn,awaiting:s.awaiting,over:s.over,deck:s.deck});
+  for(const p of VIEW.players){p.n=s.players[p.id].n;p.broken=s.players[p.id].broken;p.ctrl=s.players[p.id].ctrl;if(p.m)refreshIcons(p)}
+  for(const [k,v] of Object.entries(VIEW.known)){const c=VIEW.board.get(k);if(c&&!c.revealed)showPeekBadge(c,v)}
+  if(UI.sel&&!VIEW.hand.find(c=>c.id===UI.sel.id)){UI.sel=null;UI.targets=null;clearHighlights()}
+  const mine=VIEW.awaiting===VIEW.me&&!VIEW.over;
+  if(mine&&!wasMine){SFX.play('turn');if(UI.sel)refreshHighlights()}
+  if(!mine&&UI.sel){UI.sel=null;UI.targets=null;clearHighlights()}
+  setTurnFx();renderAll();
+  if(s.newGame)showRole();
+}
+function showPeekBadge(c,v){if(c.peek)return;const l=makeLabel(v==='gold'?'你看過：金':'你看過：煤',v==='gold'?'#ffc23d':'#aaa',40);l.position.set(0,1.1,0);c.obj.add(l);c.peek=l}
+function setTurnFx(){for(const q of VIEW.players)if(q.m){const on=q.id===VIEW.turn&&!VIEW.over;q.m.ring.material.opacity=on?.9:0;q.m.spot.intensity=on?25:0}}
+
+async function flyBetween(a,b,model,color){
+  const pa=VIEW.players[a],pb=VIEW.players[b];if(!pa||!pb)return;
+  const o=asset(model,fbBox(color,.2));o.scale.setScalar(.8);scene.add(o);
+  const p0=pa.m.g.position.clone().setY(1.4),p1=pb.m.g.position.clone().setY(1.6);
+  SFX.play('whoosh');
+  await tween(600,k=>{o.position.lerpVectors(p0,p1,k);o.position.y+=Math.sin(k*Math.PI)*1.5;o.rotation.z=k*8});
+  scene.remove(o);burst(p1,color,20,2,2,.8);
+}
+async function playEvent(e){
+  const P=VIEW.players[e.pid];
+  if(e.t==='log'){log(e.msg);return}
+  if(e.t==='path'){
+    const c={kind:'path',edges:e.edges,conn:e.conn};VIEW.board.set(K(e.x,e.y),c);const obj=cellObj(e.x,e.y,c);
+    const to=obj.position.clone(),from=P.m.g.position.clone().add(new THREE.Vector3(0,2,0)),r0=Math.random()*2-1;
+    SFX.play('whoosh');
+    await tween(650,k=>{obj.position.lerpVectors(from,to,k);obj.position.y=from.y*(1-k)+Math.sin(k*Math.PI)*1.6;obj.rotation.y=r0*(1-k)*3;obj.rotation.x=(1-k)*.8});
+    obj.position.copy(to);obj.rotation.set(0,0,0);
+    SFX.play(e.conn?'place':'dead');burst(to.clone().setY(.2),0x8a6a45,18,2,1.2,.7);
+    log(`${pn(e.pid)} 挖了一段${e.conn?'通道':'<span style="color:#ff8a7a">死路</span>'}`);
+  }else if(e.t==='rockfall'){
+    const k=K(e.x,e.y),c=VIEW.board.get(k);VIEW.board.delete(k);if(!c)return;const obj=c.obj,p0=obj.position.clone();
+    log(`${pn(e.pid)} 引爆落石，炸掉一段通道 💥`);SFX.play('shake');
+    await tween(450,k=>{obj.position.x=p0.x+(Math.random()-.5)*.12*k;obj.position.z=p0.z+(Math.random()-.5)*.12*k},ease.lin);
+    SFX.play('rockfall');burst(p0.clone().setY(.4),0x6a5644,40,4,4,1.2);burst(p0.clone().setY(.4),0xffa040,12,3,3,.5);
+    await tween(400,k=>{obj.scale.setScalar(1-k);obj.position.y=-k*.3});scene.remove(obj);
+  }else if(e.t==='break'){
+    log(`${pn(e.pid)} 弄壞了 ${pn(e.target)} 的${TOOLNAME[e.tool]} ${TOOLS[e.tool]}`);
+    await flyBetween(e.pid,e.target,TOOLMODEL[e.tool],0xff5040);SFX.play('clank');
+    const t=VIEW.players[e.target];t.broken={...t.broken,[e.tool]:true};refreshIcons(t);
+  }else if(e.t==='fix'){
+    log(`${pn(e.pid)} 修好了 ${e.target===e.pid?'自己':pn(e.target)} 的${TOOLNAME[e.tool]} ${TOOLS[e.tool]}`);
+    if(e.target!==e.pid)await flyBetween(e.pid,e.target,TOOLMODEL[e.tool],0x5fd47a);
+    SFX.play('fix');const t=VIEW.players[e.target];burst(t.m.g.position.clone().setY(1.2),0x5fd47a,20,1.5,2,.9);
+    t.broken={...t.broken,[e.tool]:false};refreshIcons(t);
+  }else if(e.t==='map'){
+    const k=K(e.x,e.y),c=VIEW.board.get(k),cv=c.cover;
+    log(`${pn(e.pid)} 用地圖偷看了一張終點卡 🗺`);SFX.play('map');
+    if(e.result){VIEW.known[k]=e.result;
+      SFX.play('lift');await tween(500,t=>{cv.position.y=.37+t*.7;cv.rotation.x=-t*.9});
+      showPeekBadge(c,e.result);SFX.play('peek');toast(e.result==='gold'?'✨ 這裡是金脈！':'這裡只有煤…');
+      await wait(1300);await tween(450,t=>{cv.position.y=1.07-t*.7;cv.rotation.x=-.9*(1-t)});
+    }else await tween(600,t=>{cv.rotation.z=Math.sin(t*Math.PI*4)*.08;cv.position.y=.37+Math.sin(t*Math.PI)*.15});
+  }else if(e.t==='discard'){log(`${pn(e.pid)} 棄了一張牌`);SFX.play('discard');await wait(250)}
+  else if(e.t==='reveal'){
+    const k=K(e.x,e.y),c=VIEW.board.get(k);c.revealed=true;c.goal=e.goal;
+    const cv=c.cover;c.cover=null;if(c.peek){c.obj.remove(c.peek);c.peek=null}
+    SFX.play('lift');await tween(800,t=>{cv.position.y=.37+t*2.2;cv.rotation.x=t*Math.PI*1.5;cv.material.forEach(m=>m.opacity=1-t)});
+    c.obj.remove(cv);const pos=c.obj.position.clone();
+    if(e.goal==='gold'){duck(4000);SFX.play('gold');const g=addGoalModel(c);
+      await tween(700,t=>{g.position.y=.12+t*.25;g.rotation.y=t*6});burst(pos.clone().setY(.6),0xffc23d,60,3,5,1.6);
+      log(`${pn(e.pid)} 挖到了 <b style="color:var(--gold)">金脈！</b>`);toast('✨ 金脈！');
+    }else{SFX.play('coal');addGoalModel(c);burst(pos.clone().setY(.5),0x333333,30,2,2.5,1);log('終點翻開：只有煤 ⚫');toast('⚫ 只有煤，繼續挖！')}
+  }else if(e.t==='end')await playEnd(e);
+}
+async function playEnd(e){
+  VIEW.over=true;VIEW.end=e;clearHighlights();UI.sel=null;
+  if(e.winner==='D'&&e.path&&e.path.length){
+    const cart=asset('Cart',fbBox(0x8a5a2a,.4));cart.scale.setScalar(.9);scene.add(cart);VIEW.cart=cart;
+    cart.position.copy(W(...e.path[0])).setY(.13);
+    for(let i=1;i<e.path.length;i++){const a=W(...e.path[i-1]).setY(.13),b=W(...e.path[i]).setY(.13),d=b.clone().sub(a);
+      cart.rotation.y=Math.atan2(-d.z,d.x);SFX.play('cart');await tween(220,k=>cart.position.lerpVectors(a,b,k),ease.lin)}
+    burst(cart.position.clone().setY(.6),0xffc23d,50,3,4,1.5);
+  }
+  await wait(500);
+  for(const g of e.goals){const c=VIEW.board.get(K(g.x,g.y));if(c&&!c.revealed&&c.cover){c.cover.visible=false;c.goal=g.goal;if(c.peek){c.obj.remove(c.peek);c.peek=null}addGoalModel(c,true)}}
+  VIEW.players.forEach((p,i)=>{const r=e.roles[i],l=makeLabel(r==='S'?'搗蛋鬼':'淘金者',r==='S'?'#ff5a4a':'#ffc23d',40);l.position.set(0,2.25,0);p.m.g.add(l)});
+  const myRole=e.roles[VIEW.me],meWin=myRole===e.winner;
+  SFX.play(meWin?'win':'lose');duck(3000);
+  $('endTitle').textContent=e.winner==='D'?'⛏ 淘金者勝利！':'😈 搗蛋鬼勝利！';
+  $('endText').innerHTML=(e.winner==='D'?'通道成功接上金脈，礦車滿載而歸。':'牌用完了，金脈依然沉睡在黑暗裡。')+'<br>'+
+    (meWin?'<b style="color:var(--green)">你贏了！</b>':'<b style="color:var(--red)">你輸了。</b>')+(e.roles.includes('S')?'':'<br><span class="dim">這局其實沒有搗蛋鬼。</span>');
+  $('endRoles').innerHTML=VIEW.players.map((p,i)=>`<div style="margin:4px">${pn(i)}：${e.roles[i]==='S'?'😈 搗蛋鬼':'⛏ 淘金者'}</div>`).join('');
+  log(e.winner==='D'?'<b>淘金者獲勝</b>':'<b>搗蛋鬼獲勝</b>');
+  const canAgain=NET.mode!=='client';$('bAgain').style.display=canAgain?'':'none';$('endWait').textContent=canAgain?'':'等待房主開新局…';
+  if(!FAST.test)$('mEnd').classList.remove('hide');
+  renderAll();
+}
+
+/* =========================================================
+   UI — hand, targets, board interaction
+   ========================================================= */
+const UI={sel:null,rot:false,ghosts:[],hover:null,targets:null};
+const meP=()=>VIEW.players[VIEW.me];
+const myTurn=()=>!VIEW.over&&VIEW.awaiting===VIEW.me&&!VIEW.busy&&GAME_ON;
+function drawPathIcon(cv,edges,conn){
+  const s=cv.width=cv.height=124,g=cv.getContext('2d');g.fillStyle='#5d4b3b';g.fillRect(0,0,s,s);
+  g.fillStyle='#3d2f24';for(let i=0;i<30;i++){g.beginPath();g.arc((i*37)%s,(i*53)%s,(i%6)+1,0,7);g.fill()}
+  const w=34,c=s/2;g.fillStyle='#e0b878';
+  if(edges[0])g.fillRect(c-w/2,0,w,c);if(edges[2])g.fillRect(c-w/2,c,w,c);if(edges[1])g.fillRect(c,c-w/2,c,w);if(edges[3])g.fillRect(0,c-w/2,c,w);
+  if(conn)g.fillRect(c-w/2,c-w/2,w,w);else{g.fillStyle='#2a201a';g.beginPath();g.arc(c,c,w*.75,0,7);g.fill();
+    g.fillStyle='#ff6b5a';g.font='900 26px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('✕',c,c+1)}
+}
+function cardEl(card){
+  const d=document.createElement('div');d.className='card'+(UI.sel&&UI.sel.id===card.id?' sel':'');
+  if(card.type==='path'){const cv=document.createElement('canvas');drawPathIcon(cv,UI.sel&&UI.sel.id===card.id?rotEdges(card.edges,UI.rot):card.edges,card.conn);d.appendChild(cv);
+    d.insertAdjacentHTML('beforeend',`<div class="lbl">${card.conn?'通道':'死路'}</div>`);if(meP()&&isBroken(meP().broken))d.classList.add('blocked')}
+  else{const m=card.type==='break'?[TOOLS[card.tool],'弄壞'+TOOLNAME[card.tool],'#ff8a7a']:card.type==='fix'?[card.tools.map(t=>TOOLS[t]).join(''),'修理 '+card.tools.map(t=>TOOLNAME[t]).join('/'),'#8ae39c']:card.type==='rockfall'?['💥','落石','#f3e6d2']:['🗺','地圖','#f3e6d2'];
+    d.innerHTML=`<div class="em">${m[0]}</div><div class="lbl" style="color:${m[2]}">${m[1]}</div>`}
+  d.onclick=()=>selectCard(card);return d;
+}
+function renderAll(){
+  const P=$('players');P.innerHTML='';
+  for(const p of VIEW.players){const d=document.createElement('div');d.className='pl'+(VIEW.turn===p.id&&!VIEW.over?' turn':'');
+    const tools=Object.keys(p.broken).filter(t=>p.broken[t]).map(t=>`<span title="${TOOLNAME[t]}壞了" style="filter:drop-shadow(0 0 3px #f44)">${TOOLS[t]}</span>`).join('');
+    const tag=p.ctrl==='ai'?'<span class="tag">AI</span>':'';
+    d.innerHTML=`<span class="dot" style="background:${PCOL[p.id]}"></span><span class="nm">${esc(p.name)}${p.id===VIEW.me?'（你）':''}</span>${tag}<span class="cnt">${p.n}張</span><span class="tools">${tools||'<span style="color:#5fd47a;font-size:11px">完好</span>'}</span>`;
+    if(UI.targets&&UI.targets.includes(p.id)){d.classList.add('target');if(UI.sel&&UI.sel.type==='break')d.classList.add('bad');d.onclick=()=>pickTarget(p.id)}
+    P.appendChild(d)}
+  const r=VIEW.role;
+  $('role').innerHTML=r?`你的身分：<b style="color:${r==='S'?'var(--red)':'var(--gold)'}">${r==='S'?'😈 搗蛋鬼':'⛏ 淘金者'}</b><br><span style="font-size:11px;color:var(--dim)">${r==='S'?'別讓他們挖到金脈，但別被識破。':'找出金脈，小心身邊的搗蛋鬼。'}</span>`:'';
+  const cur=VIEW.players[VIEW.turn];
+  $('status').innerHTML=!GAME_ON?'':VIEW.over?'<b>本局結束</b>':`輪到：${cur?pn(cur.id):''}${VIEW.turn===VIEW.me?' — 選一張牌':' 思考中…'}<br><span class="dim">牌庫剩 ${VIEW.deck} 張</span>`;
+  const H=$('hand');H.innerHTML='';VIEW.hand.forEach(c=>H.appendChild(cardEl(c)));
+  $('handWrap').style.display=GAME_ON?'flex':'none';
+  const can=myTurn();
+  $('bRot').disabled=!(can&&UI.sel&&UI.sel.type==='path');$('bDiscard').disabled=!(can&&UI.sel);$('bCancel').disabled=!UI.sel;
+  $('netBadge').innerHTML=NET.mode==='solo'?'<span class="dim">單人模式</span>':NET.mode==='host'?`<span style="color:var(--green)">● 房主</span> <span class="dim">房號 ${NET.code}</span>`:NET.mode==='client'?`<span style="color:var(--blue)">● 已連線</span> <span class="dim">房號 ${NET.code}</span>`:'';
+  setHint();
+}
+function setHint(){
+  const h=$('hint');if(!GAME_ON||VIEW.over){h.textContent='';return}
+  if(!myTurn()){h.textContent=VIEW.turn===VIEW.me?'':'等待其他礦工…';return}
+  if(!UI.sel){h.textContent='輪到你了：點一張手牌';return}
+  const t=UI.sel.type;
+  h.textContent=t==='path'?(isBroken(meP().broken)?'你的工具壞了，不能挖通道，只能棄掉這張。':(UI.ghosts.length?'點棋盤上綠色格子放置（R 旋轉）':'這個方向放不下，旋轉看看或棄掉。'))
+    :t==='break'?(UI.targets.length?'點左側紅框的玩家，弄壞他的工具':'沒有可下手的對象'):t==='fix'?(UI.targets.length?'點左側綠框的玩家修理':'目前沒人需要這種修理')
+    :t==='rockfall'?'點棋盤上紅色的通道卡炸掉它':'點一張藍色的終點卡偷看';
+}
+function selectCard(card){if(!myTurn())return;if(UI.sel&&UI.sel.id===card.id){cancelSel();return}
+  UI.sel=card;UI.rot=false;SFX.play('select');refreshHighlights();renderAll()}
+function cancelSel(){UI.sel=null;UI.targets=null;clearHighlights();renderAll()}
+function clearHighlights(){for(const g of UI.ghosts)scene.remove(g.mesh);UI.ghosts=[];if(UI.hover){scene.remove(UI.hover);UI.hover=null}}
+function refreshHighlights(){
+  clearHighlights();UI.targets=null;const c=UI.sel;if(!c)return;const me=meP();
+  if(c.type==='path'){if(isBroken(me.broken))return;for(const pl of placementsOf(VIEW.board,c,UI.rot))addGhost(pl.x,pl.y,MAT.ok)}
+  else if(c.type==='rockfall'){for(const [k,v] of VIEW.board)if(v.kind==='path')addGhost(...XY(k),MAT.bad,.45)}
+  else if(c.type==='map'){for(const [x,y] of GOALS)if(!VIEW.board.get(K(x,y)).revealed)addGhost(x,y,MAT.peek,.66)}
+  else if(c.type==='break')UI.targets=VIEW.players.filter(q=>q.id!==VIEW.me&&!q.broken[c.tool]).map(q=>q.id);
+  else if(c.type==='fix')UI.targets=VIEW.players.filter(q=>c.tools.some(t=>q.broken[t])).map(q=>q.id);
+}
+function addGhost(x,y,mat,h=.02){const g=new THREE.Mesh(GEO.plane,mat);g.rotation.x=-Math.PI/2;g.position.copy(W(x,y)).setY(h);g.renderOrder=5;scene.add(g);UI.ghosts.push({x,y,mesh:g})}
+function pickTarget(pid){const c=UI.sel;if(!myTurn()||!c)return;
+  if(c.type==='break')submit({kind:'break',cardId:c.id,target:pid});
+  if(c.type==='fix')submit({kind:'fix',cardId:c.id,target:pid,tool:c.tools.find(t=>VIEW.players[pid].broken[t])})}
+function submit(a){UI.sel=null;UI.targets=null;clearHighlights();VIEW.awaiting=-1;renderAll();
+  if(NET.mode==='client')safeSend(NET.hostConn,{type:'act',a});else ENGINE.receive(VIEW.me,a)}
+function clickCell(x,y){const c=UI.sel;if(!myTurn()||!c||!UI.ghosts.find(g=>g.x===x&&g.y===y))return;
+  if(c.type==='path')submit({kind:'path',cardId:c.id,x,y,rot:UI.rot});
+  else if(c.type==='rockfall')submit({kind:'rockfall',cardId:c.id,x,y});
+  else if(c.type==='map')submit({kind:'map',cardId:c.id,x,y})}
+function hoverCell(x,y){
+  if(UI.hover){scene.remove(UI.hover);UI.hover=null}
+  const on=UI.ghosts.find(g=>g.x===x&&g.y===y),c=UI.sel;canvas.style.cursor=on?'pointer':'';
+  if(!c||c.type!=='path'||!on)return;
+  const t=buildTile(rotEdges(c.edges,UI.rot),c.conn);t.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.material.transparent=true;o.material.opacity=.6;o.castShadow=false}});
+  t.position.copy(W(x,y)).setY(.25);scene.add(t);UI.hover=t;
+}
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),-.12);
+function cellAt(ev){const r=canvas.getBoundingClientRect();ndc.set((ev.clientX-r.left)/r.width*2-1,-(ev.clientY-r.top)/r.height*2+1);
+  ray.setFromCamera(ndc,camera);const p=new THREE.Vector3();if(!ray.ray.intersectPlane(plane,p))return null;return [Math.round(p.x/S),Math.round(-p.z/S)]}
+let down=null,lastHover='';
+canvas.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY]});
+canvas.addEventListener('pointerup',e=>{if(!down)return;const mv=Math.hypot(e.clientX-down[0],e.clientY-down[1]);down=null;
+  if(mv<8&&e.button===0){const c=cellAt(e);if(c){hoverCell(...c);clickCell(...c)}}});
+canvas.addEventListener('pointermove',e=>{const c=cellAt(e),k=c?K(...c):'';if(k!==lastHover){lastHover=k;if(c)hoverCell(...c)}});
+function rotate(){if(!UI.sel||UI.sel.type!=='path')return;UI.rot=!UI.rot;SFX.play('rotate');refreshHighlights();lastHover='';renderAll()}
+addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;if(e.key==='r'||e.key==='R')rotate();if(e.key==='Escape')cancelSel()});
+$('bRot').onclick=rotate;$('bCancel').onclick=cancelSel;
+$('bDiscard').onclick=()=>{if(myTurn()&&UI.sel)submit({kind:'discard',cardId:UI.sel.id})};
+$('bFast').onclick=e=>{FAST.on=!FAST.on;e.target.classList.toggle('primary',FAST.on)};
+$('bCam').onclick=()=>{camera.position.copy(CAM0.pos);controls.target.copy(CAM0.tgt)};
+$('bRules').onclick=()=>$('mRules').classList.remove('hide');$('bRulesClose').onclick=()=>$('mRules').classList.add('hide');
+
+/* =========================================================
+   GAME SESSION + NETWORK (PeerJS, host-authoritative)
+   ========================================================= */
+let ENGINE=null,GAME_ON=false;
+const NET={mode:null,peer:null,code:'',pass:'',hostConn:null,members:[],name:''};
+const PEER_PREFIX='deepvein-v2-';
+function peerOpts(){const o={debug:0};const ph=QS.get('peer');if(ph){const [h,p]=ph.split(':');Object.assign(o,{host:h,port:+p||9000,path:'/',secure:false})}return o}
+function safeSend(conn,msg){try{if(conn&&conn.open)conn.send(msg)}catch(e){console.warn(e)}}
+const netOK=()=>typeof window.Peer==='function';
+
+function showRole(){
+  const r=VIEW.role,rc=$('rc');rc.classList.remove('flip');
+  $('rcBack').innerHTML=r==='S'?'<div class="big">😈</div><div style="color:var(--red)">搗蛋鬼</div>':'<div class="big">⛏</div><div style="color:var(--gold)">淘金者</div>';
+  $('roleText').innerHTML=r==='S'?'暗中阻撓大家挖到金脈。<br><span class="dim">放死路、弄壞工具、引爆落石——但別被發現。</span>':'和夥伴一起挖到金脈。<br><span class="dim">注意誰在扯後腿，用損壞卡制住他。</span>';
+  if(FAST.test)return;
+  $('mStart').classList.remove('hide');setTimeout(()=>{rc.classList.add('flip');SFX.play('lift')},500);
+}
+$('bGo').onclick=()=>{$('mStart').classList.add('hide');startMusic();if(ENGINE&&!ENGINE.running)ENGINE.run()};
+
+function beginEngine(seats){
+  if(ENGINE)ENGINE.stop();
+  ENGINE=new Engine(seats,0);GAME_ON=true;$('mLobby').classList.add('hide');
+  for(const p of ENGINE.remotes())safeSend(p.conn,{type:'start'});
+  ENGINE.sendSync(true,true);
+}
+function aiFill(seats){const used=new Set(seats.map(s=>s.name));const pool=AINAMES.filter(n=>!used.has(n));while(seats.length<4)seats.push({name:pool.shift(),ctrl:'ai'});return seats}
+function startSolo(){NET.mode='solo';beginEngine(aiFill([{name:NET.name,ctrl:'local'}]))}
+function startOnline(){
+  const seats=[{name:NET.name,ctrl:'local'}];
+  for(const m of NET.members)if(m.conn.open)seats.push({name:m.name,ctrl:'remote',conn:m.conn});
+  beginEngine(aiFill(seats));
+}
+$('bAgain').onclick=()=>{$('mEnd').classList.add('hide');
+  if(NET.mode==='solo')startSolo();
+  else if(NET.mode==='host'){NET.members=NET.members.filter(m=>m.conn.open);startOnline()}};
+$('bEndClose').onclick=()=>$('mEnd').classList.add('hide');
+$('bToLobby').onclick=()=>leave();$('bLeave').onclick=()=>leave();$('bMsgOk').onclick=()=>leave();
+function leave(){try{if(NET.peer)NET.peer.destroy()}catch(e){}const u=new URL(location.href);u.searchParams.delete('room');location.href=u.toString()}
+
+/* ---------- host ---------- */
+function lobbyBroadcast(){
+  const names=[NET.name,...NET.members.map(m=>m.name)];
+  for(const m of NET.members)safeSend(m.conn,{type:'lobby',names,code:NET.code});
+  renderMembers($('hostMembers'),names);
+}
+function renderMembers(el,names){
+  el.innerHTML='';for(let i=0;i<4;i++){const n=names[i];
+    el.insertAdjacentHTML('beforeend',n?`<div class="member"><span class="dot" style="background:${PCOL[i]}"></span>${esc(n)}${i===0?' <span class="dim">（房主）</span>':''}</div>`:'<div class="member empty">空位（開始時由 AI 補上）</div>')}
+}
+function createRoom(){
+  const code=($('iHostCode').value.trim()||randCode()).toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(code.length<4)return lobbyErr('房號至少 4 碼英數字');
+  if(!netOK())return lobbyErr('無法載入連線元件，請確認網路，或使用 GitHub Pages 版本。');
+  NET.code=code;NET.pass=$('iHostPass').value;lobbyErr('建立中…');$('bHost').disabled=true;
+  const peer=new Peer(PEER_PREFIX+code.toLowerCase(),peerOpts());NET.peer=peer;
+  peer.on('open',()=>{NET.mode='host';lobbyErr('');$('hostForm').style.display='none';$('hostRoom').style.display='';
+    $('hostCodeShow').textContent=code;$('passShow').textContent=NET.pass?`密碼：${NET.pass}`:'（無密碼）';lobbyBroadcast();SFX.play('join')});
+  peer.on('error',err=>{$('bHost').disabled=false;
+    if(err.type==='unavailable-id')lobbyErr('這個房號已經有人在用，換一個試試。');
+    else if(!GAME_ON)lobbyErr('連線伺服器失敗（'+err.type+'），請稍後再試。');else console.warn(err)});
+  peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
+  peer.on('connection',conn=>{conn.on('data',m=>hostOnData(conn,m));conn.on('close',()=>hostOnClose(conn));});
+}
+function hostOnData(conn,m){
+  if(m.type==='hello'){
+    if(m.ver!==VERSION)return reject(conn,'遊戲版本不同，請重新整理頁面。');
+    if((NET.pass||'')!==(m.pass||''))return reject(conn,'密碼錯誤。');
+    let name=String(m.name||'礦工').slice(0,10);
+    if(GAME_ON&&ENGINE){ // rejoin
+      const p=ENGINE.players.find(q=>q.name===name&&q.wasRemote&&q.ctrl==='ai');
+      if(!p)return reject(conn,'遊戲已經開始了，等這局結束再加入吧。');
+      p.ctrl='remote';p.conn=conn;conn._pid=p.id;
+      const mm=NET.members.find(x=>x.name===name);if(mm)mm.conn=conn;else NET.members.push({name,conn});
+      safeSend(conn,{type:'welcome',code:NET.code});safeSend(conn,{type:'start'});
+      safeSend(conn,{type:'sync',s:ENGINE.syncFor(p.id,true,false)});
+      ENGINE.broadcast([{t:'log',msg:`<b>${esc(name)}</b> 重新連線`}]);ENGINE.sendSync();SFX.play('join');return;
+    }
+    if(NET.members.length>=3)return reject(conn,'房間已滿（最多 4 人）。');
+    const names=[NET.name,...NET.members.map(x=>x.name)];let n=name,i=2;while(names.includes(n))n=name+i++;
+    NET.members.push({name:n,conn});safeSend(conn,{type:'welcome',code:NET.code,name:n});lobbyBroadcast();SFX.play('join');
+  }else if(m.type==='act'&&ENGINE){const p=ENGINE.players.find(q=>q.conn===conn);if(p)ENGINE.receive(p.id,m.a)}
+}
+function reject(conn,reason){safeSend(conn,{type:'reject',reason});setTimeout(()=>conn.close(),400)}
+function hostOnClose(conn){
+  if(GAME_ON&&ENGINE){const p=ENGINE.players.find(q=>q.conn===conn);if(p)ENGINE.dropToAI(p.id,'斷線了');}
+  const i=NET.members.findIndex(m=>m.conn===conn);
+  if(i>=0&&!GAME_ON){NET.members.splice(i,1);lobbyBroadcast()}
+}
+/* ---------- client ---------- */
+function joinRoom(){
+  const code=$('iJoinCode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(code.length<4)return lobbyErr('請輸入房號');
+  if(!netOK())return lobbyErr('無法載入連線元件，請確認網路，或使用 GitHub Pages 版本。');
+  NET.code=code;lobbyErr('連線中…');$('bJoin').disabled=true;
+  const peer=new Peer(undefined,peerOpts());NET.peer=peer;
+  const fail=t=>{$('bJoin').disabled=false;lobbyErr(t)};
+  peer.on('error',err=>{if(err.type==='peer-unavailable')fail('找不到這個房間，確認房號是否正確、房主是否還在線上。');
+    else if(GAME_ON)console.warn(err);else fail('連線失敗（'+err.type+'），請稍後再試。')});
+  peer.on('open',()=>{
+    const conn=peer.connect(PEER_PREFIX+code.toLowerCase(),{reliable:true});NET.hostConn=conn;
+    const to=setTimeout(()=>{if(!conn.open)fail('連線逾時。可能是網路環境擋住了點對點連線，換個網路（例如手機熱點）再試。')},15000);
+    conn.on('open',()=>{clearTimeout(to);safeSend(conn,{type:'hello',name:NET.name,pass:$('iJoinPass').value,ver:VERSION})});
+    conn.on('data',m=>clientOnData(m));
+    conn.on('close',()=>{if(NET.mode==='client')msg('與房主斷線','房主可能關閉了頁面或網路中斷。你可以回大廳重新加入（用同樣的暱稱可以接回原本的座位）。')});
+  });
+}
+function clientOnData(m){
+  if(m.type==='reject'){$('bJoin').disabled=false;lobbyErr(m.reason);NET.mode=null;return}
+  if(m.type==='welcome'){NET.mode='client';if(m.name)NET.name=m.name;lobbyErr('');$('joinForm').style.display='none';$('joinRoom').style.display='';$('joinCodeShow').textContent=m.code;SFX.play('join');return}
+  if(m.type==='lobby'){renderMembers($('joinMembers'),m.names);return}
+  if(m.type==='start'){GAME_ON=true;$('mLobby').classList.add('hide');$('mEnd').classList.add('hide');return}
+  if(m.type==='sync'){VIEW.enqueueSync(m.s);return}
+  if(m.type==='events'){VIEW.enqueueEvents(m.evts);return}
+}
+function msg(t,x){$('msgTitle').textContent=t;$('msgText').textContent=x;$('mMsg').classList.remove('hide')}
+function randCode(){const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<5;i++)s+=a[Math.floor(Math.random()*a.length)];return s}
+function lobbyErr(t){$('lobbyErr').textContent=t}
+
+/* ---------- lobby wiring ---------- */
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  if(NET.mode==='host'||NET.mode==='client')return;
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('[data-pane]').forEach(p=>p.style.display=p.dataset.pane===b.dataset.tab?'':'none');lobbyErr('');SFX.init();SFX.play('select')});
+function getName(){const n=$('iName').value.trim().slice(0,10);if(!n){lobbyErr('先輸入暱稱');$('iName').focus();return null}
+  try{localStorage.setItem('dv-name',n)}catch(e){}NET.name=n;return n}
+$('bSolo').onclick=()=>{if(!getName())return;startMusic();startSolo()};
+$('bHost').onclick=()=>{if(!getName())return;startMusic();createRoom()};
+$('bJoin').onclick=()=>{if(!getName())return;startMusic();joinRoom()};
+$('bStartOnline').onclick=()=>{startMusic();startOnline()};
+$('bCopyLink').onclick=async()=>{const u=new URL(location.href);u.searchParams.set('room',NET.code);
+  try{await navigator.clipboard.writeText(u.toString());$('bCopyLink').textContent='已複製 ✓'}catch(e){$('bCopyLink').textContent=u.toString()}};
+function showLobby(){
+  try{$('iName').value=localStorage.getItem('dv-name')||''}catch(e){}
+  $('iHostCode').value=randCode();
+  const room=QS.get('room');
+  if(room){$('iJoinCode').value=room.toUpperCase();document.querySelector('.tabs button[data-tab="join"]').click()}
+  if(!netOK())$('netNote').innerHTML='⚠️ 這個環境無法使用線上連線，只能玩單人模式。線上對戰請使用 GitHub Pages 版本。';
+  $('mLobby').classList.remove('hide');
+}
+
+/* ---------- loop ---------- */
+const clock=new THREE.Clock();
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+addEventListener('resize',resize);resize();
+function loop(){
+  const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+  for(let i=tweens.length-1;i>=0;i--){const tw=tweens[i];tw.t+=dt*1000;const k=Math.min(1,tw.t/tw.dur);tw.fn(tw.e(k));if(k>=1){tweens.splice(i,1);tw.res()}}
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i],u=p.userData;u.age+=dt;u.v.y-=6*dt;p.position.addScaledVector(u.v,dt);
+    if(p.position.y<.05){p.position.y=.05;u.v.multiplyScalar(.5);u.v.y*=-.3}p.rotation.x+=dt*5;
+    if(u.age>u.life){scene.remove(p);parts.splice(i,1)}else p.scale.multiplyScalar(1-dt*.6)}
+  for(const p of VIEW.players){if(!p.m)continue;const act=VIEW.turn===p.id&&!VIEW.over;
+    p.m.body.position.y=act?Math.abs(Math.sin(t*5))*.08:Math.sin(t*1.5+p.id)*.01;
+    p.m.icons.children.forEach((o,i)=>{o.rotation.y=t*2+i;o.position.y=Math.sin(t*3+i)*.05});
+    if(act)p.m.ring.material.opacity=.5+Math.sin(t*4)*.4}
+  for(const g of UI.ghosts)g.mesh.material.opacity=.22+Math.sin(t*4)*.12;
+  startLight.intensity=5+Math.sin(t*7)*.4+Math.sin(t*13)*.3;dust.rotation.y=t*.01;dust.position.y=Math.sin(t*.3)*.2;
+  controls.update();renderer.render(scene,camera);requestAnimationFrame(loop);
+}
+
+// test hooks
+window.DV={VIEW,NET,FAST,SFX,SOUNDS,get ENGINE(){return ENGINE},
+  async autoplay(){FAST.test=true;NET.mode='solo';beginEngine(aiFill([]).map(s=>({...s,ctrl:'ai'})));await VIEW.chain;await ENGINE.run();await VIEW.chain;
+    return {winner:ENGINE.winner,deck:ENGINE.deck.length,sab:ENGINE.players.some(p=>p.role==='S')}},
+  humanAI(){if(!ENGINE)return false;const p=ENGINE.players.find(q=>q.pending);if(!p)return false;const a=aiDecide(ENGINE,p);
+    ENGINE.receive(p.id,{kind:a.kind,cardId:a.card.id,x:a.x,y:a.y,rot:a.rot,target:a.target?a.target.id:undefined,tool:a.tool});return true},
+  myAction(){ // used by tests on a client: compute a legal action locally and submit it
+    if(!myTurn())return false;const hand=VIEW.hand,me=meP();
+    for(const c of hand)if(c.type==='path'&&!isBroken(me.broken)){const pl=placementsOf(VIEW.board,c)[0];if(pl){submit({kind:'path',cardId:c.id,...pl});return 'path'}}
+    submit({kind:'discard',cardId:hand[0].id});return 'discard'}};
+
+(async()=>{
+  try{await loadAssets()}catch(e){console.warn('asset load failed, using fallbacks',e)}
+  $('loading').remove();loop();showLobby();
+})();
+</script>
+</body>
+</html>
