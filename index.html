@@ -504,7 +504,10 @@ class Engine{
     let again=true;
     while(again&&!this.over){again=false;
       for(const k of reachOf(this.board).touched){const c=this.board.get(k);if(c.revealed)continue;
-        c.revealed=true;again=true;const [x,y]=XY(k);ev.push({t:'reveal',pid:p.id,x,y,goal:c.goal});
+        c.revealed=true;again=true;const [x,y]=XY(k);
+        // a revealed goal fits the tunnels around it: match every neighbour, stay open toward empty cells
+        c.edges=DIRS.map(([dx,dy],d)=>{const n=this.board.get(K(x+dx,y+dy));return n&&!(n.kind==='goal'&&!n.revealed)?!!n.edges[(d+2)%4]:true});
+        ev.push({t:'reveal',pid:p.id,x,y,goal:c.goal,edges:c.edges});
         if(c.goal==='gold'){this.goldCell=k;this.finder=p.id;this.finish('D',ev);return}
         for(const q of this.players)q.known[k]='coal';}}
   }
@@ -992,7 +995,10 @@ async function playEvent(e){
     const k=K(e.x,e.y),c=VIEW.board.get(k);c.revealed=true;c.goal=e.goal;
     const cv=c.cover;c.cover=null;if(c.peek){c.obj.remove(c.peek);c.peek=null}
     SFX.play('lift');await tween(800,t=>{cv.position.y=CY+t*3;cv.rotation.x=t*Math.PI*1.5;cv.material.forEach(m=>m.opacity=1-t)});
-    c.obj.remove(cv);const pos=c.obj.position.clone();
+    c.obj.remove(cv);
+    if(e.edges&&e.edges.join()!==c.edges.join()){ // reshape the chamber to fit the tunnels around it
+      board.remove(c.obj);c.edges=e.edges;c.obj=buildTile(c.edges,c.conn,'goal');c.obj.position.copy(W(e.x,e.y));board.add(c.obj)}
+    const pos=c.obj.position.clone();
     for(const q of VIEW.players)if(q.pos===k){const a=q.m.g.position.clone(),b=cellPos(k,q.id);tween(300,t=>q.m.g.position.lerpVectors(a,b,t))}
     if(e.goal==='gold'){duck(4000);SFX.play('gold');const g=addGoalModel(c);
       await tween(700,t=>{g.position.y=.02+t*.3;g.rotation.y=t*3});burst(pos.clone().setY(.8),0xffc23d,70,4,6,1.6);
@@ -1052,7 +1058,12 @@ async function playEnd(e){
 const UI={sel:null,rot:false,ghosts:[],hover:null,targets:null};
 const meP=()=>VIEW.players[VIEW.me];
 const myTurn=()=>!VIEW.over&&VIEW.awaiting===VIEW.me&&!VIEW.busy&&GAME_ON;
-function drawPathIcon(cv,edges,conn){
+// which board direction (0=N,1=E,2=S,3=W) currently points to the top of the screen
+let ICON_UP=0;
+function viewUp(){const t=board.worldToLocal(controls.target.clone()),c=board.worldToLocal(camera.position.clone()),fx=t.x-c.x,fz=t.z-c.z;
+  const a=[[0,-1],[1,0],[0,1],[-1,0]].map(([x,z])=>x*fx+z*fz);return a.indexOf(Math.max(...a))}
+function drawPathIcon(cv,edges0,conn){
+  const u=ICON_UP,edges=[edges0[u],edges0[(u+1)%4],edges0[(u+2)%4],edges0[(u+3)%4]]; // [top,right,bottom,left] on screen
   const s=cv.width=cv.height=124,g=cv.getContext('2d');g.fillStyle='#5d4b3b';g.fillRect(0,0,s,s);
   g.fillStyle='#3d2f24';for(let i=0;i<30;i++){g.beginPath();g.arc((i*37)%s,(i*53)%s,(i%6)+1,0,7);g.fill()}
   const w=34,c=s/2;g.fillStyle='#e0b878';
@@ -1322,8 +1333,10 @@ function fitCamera(force){
     camera.fov=a<.55?55:50;CAM0.tgt.set(PIVOT.x,0,PIVOT.z+1.4);CAM0.pos.set(CAM0.tgt.x,a<.55?22:19,CAM0.tgt.z+11);
   }else if(h<=520){camera.fov=50;CAM0.tgt.set(PIVOT.x,0,1.6);CAM0.pos.set(PIVOT.x,15,13)}
   else{camera.fov=a<1.4?50:45;CAM0.tgt.set(PIVOT.x,0,.6);CAM0.pos.set(PIVOT.x,a<1.4?21:17.5,a<1.4?17:14)}
-  camera.position.copy(CAM0.pos);controls.target.copy(CAM0.tgt);camera.updateProjectionMatrix();
+  camera.position.copy(CAM0.pos);controls.target.copy(CAM0.tgt);camera.updateProjectionMatrix();syncIconUp();
 }
+function syncIconUp(){const u=viewUp();if(u!==ICON_UP){ICON_UP=u;if(GAME_ON)renderAll()}}
+controls.addEventListener('change',syncIconUp);
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;fitCamera();camera.updateProjectionMatrix()}
 addEventListener('resize',resize);resize();
 function loop(){
@@ -1342,7 +1355,17 @@ function loop(){
 }
 
 // test hooks
-window.DV={cam:()=>({p:camera.position.toArray().map(v=>+v.toFixed(2)),t:controls.target.toArray().map(v=>+v.toFixed(2)),fov:camera.fov,w:innerWidth,h:innerHeight,rot:world.rotation.y}),VIEW,NET,FAST,SFX,SOUNDS,UI,cellScreen(x,y){const v=W(x,y).setY(.12);board.localToWorld(v);v.project(camera);return [(v.x+1)/2*innerWidth,(1-v.y)/2*innerHeight]},get ENGINE(){return ENGINE},
+window.DV={audit(){ // rule audit on the current engine board
+    const B=ENGINE.board,bad=[];
+    for(const [k,c] of B){if(c.kind==='goal'&&!c.revealed)continue;const [x,y]=XY(k);
+      for(let d=0;d<4;d++){const n=B.get(K(x+DIRS[d][0],y+DIRS[d][1]));if(!n||(n.kind==='goal'&&!n.revealed))continue;
+        if(c.edges[d]!==n.edges[(d+2)%4])bad.push(c.kind+'-'+n.kind)}}
+    let viewDiff=0;for(const [k,c] of B){const v=VIEW.board.get(k);if(!v||v.edges.join()!==c.edges.join()||v.conn!==c.conn)viewDiff++}
+    // every highlighted placement must be accepted by the engine for every path card
+    let rejected=0,checked=0;const p=ENGINE.players[0];
+    for(const c of buildDeck(1).filter(c=>c.type==='path'))for(const r of[false,true])for(const pl of placementsOf(VIEW.board,c,r)){
+      checked++;const e=rotEdges(c.edges,r);if(!canPlaceOn(B,e,pl.x,pl.y,reachOf(B)))rejected++}
+    return {bad,viewDiff,checked,rejected}},get iconUp(){return ICON_UP},orbit(a){const t=controls.target,v=camera.position.clone().sub(t);v.applyAxisAngle(new THREE.Vector3(0,1,0),a);camera.position.copy(t).add(v);controls.update();syncIconUp()},cam:()=>({p:camera.position.toArray().map(v=>+v.toFixed(2)),t:controls.target.toArray().map(v=>+v.toFixed(2)),fov:camera.fov,w:innerWidth,h:innerHeight,rot:world.rotation.y}),VIEW,NET,FAST,SFX,SOUNDS,UI,cellScreen(x,y){camera.updateMatrixWorld();const v=W(x,y).setY(.12);board.localToWorld(v);v.project(camera);return [(v.x+1)/2*innerWidth,(1-v.y)/2*innerHeight]},get ENGINE(){return ENGINE},
   async autoplay(d,n){if(d)DIFF=d;if(n)NPLAYERS=n;FAST.test=true;NET.mode='solo';beginEngine(aiFill([]).map(s=>({...s,ctrl:'ai'})));await VIEW.chain;await ENGINE.run();await VIEW.chain;
     return {winner:ENGINE.winner,deck:ENGINE.deck.length,sab:ENGINE.players.some(p=>p.role==='S')}},
   async autoMatch(r=3){FAST.test=true;NET.mode='solo';ROUNDS=r;beginEngine(aiFill([]).map(s=>({...s,ctrl:'ai'})));const out=[];
