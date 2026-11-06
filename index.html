@@ -93,6 +93,15 @@ table.score{width:100%;border-collapse:collapse;margin-top:6px;font-size:14px}
 table.score th{font-size:11px;color:var(--dim);font-weight:400;text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
 table.score td{padding:6px;border-bottom:1px solid rgba(255,200,120,.08);text-align:left}
 .nug{display:inline-block;background:#3a2a12;border:1px solid var(--gold);border-radius:6px;padding:0 6px;color:var(--gold);font-weight:900}
+.pl .gold{min-width:34px}
+#caption{position:fixed;left:50%;top:14px;transform:translate(-50%,-10px);opacity:0;z-index:7;padding:10px 22px;font-size:18px;font-weight:700;pointer-events:none;transition:opacity .35s,transform .35s;max-width:60vw;text-align:center}
+#caption.show{opacity:1;transform:translate(-50%,0)}
+body.spectate #top{width:340px}body.spectate #info{width:380px}
+body.spectate .pl{padding:9px 10px}body.spectate .pl .nm{font-size:18px}body.spectate .pl .gold,body.spectate .pl .cnt{font-size:15px}body.spectate .pl .tools{font-size:18px}
+body.spectate #status{font-size:18px}body.spectate #log{font-size:15px;max-height:58vh;line-height:1.7}
+body.spectate #caption{font-size:30px;top:24px;padding:14px 30px}
+body.spectate #title h1{font-size:24px}
+@media (max-width:760px){body.spectate #top{width:auto}body.spectate #caption{font-size:16px;top:auto;bottom:16px}}
 .champ{font-size:18px;font-weight:900;color:var(--gold);margin:4px 0 10px}
 #players:empty,#role:empty,#status:empty,#log:empty{display:none}
 #handWrap{display:none}
@@ -181,6 +190,7 @@ button{touch-action:manipulation}
     <button id="bRules">規則</button>
     <button id="bFast">快轉</button>
     <button id="bCam">視角</button>
+    <button id="bAuto" style="display:none">自動鏡頭</button>
     <button id="bLeave">離開</button>
   </div>
   <div id="log" class="panel"></div>
@@ -197,6 +207,7 @@ button{touch-action:manipulation}
 </div>
 
 <div id="toast" class="panel"></div>
+<div id="caption" class="panel"></div>
 
 <!-- LOBBY -->
 <div id="mLobby" class="modal hide"><div class="mbox panel">
@@ -229,7 +240,7 @@ button{touch-action:manipulation}
     <div id="hostRoom" style="display:none">
       <div class="dim">把房號和密碼告訴朋友，或直接傳邀請連結：</div>
       <div class="code" id="hostCodeShow"></div>
-      <div class="row"><button id="bCopyLink" style="flex:1">複製邀請連結</button><span id="passShow" class="dim"></span></div>
+      <div class="row"><button id="bCopyLink" style="flex:1">複製邀請連結</button><button id="bCopyWatch" style="flex:1">複製觀戰連結</button><span id="passShow" class="dim"></span></div>
       <div class="members" id="hostMembers"></div>
       <button class="primary" id="bStartOnline" style="width:100%">開始遊戲（空位由 AI 補上）</button>
     </div>
@@ -241,12 +252,13 @@ button{touch-action:manipulation}
         <div class="field" style="flex:1"><label>房號</label><input id="iJoinCode" maxlength="8"></div>
         <div class="field" style="flex:1"><label>房間密碼</label><input id="iJoinPass" maxlength="16"></div>
       </div>
-      <button class="primary" id="bJoin" style="width:100%">加入房間</button>
+      <div class="row"><button class="primary" id="bJoin" style="flex:2">加入房間</button><button id="bWatch" style="flex:1">👁 觀戰</button></div>
+      <p class="dim" style="margin:6px 0 0">觀戰者不佔座位，看不到任何人的身分和手牌，適合投影到大螢幕。</p>
     </div>
     <div id="joinRoom" style="display:none">
       <div class="code" id="joinCodeShow"></div>
       <div class="members" id="joinMembers"></div>
-      <p class="dim" style="text-align:center">已加入，等待房主開始遊戲…</p>
+      <p class="dim" style="text-align:center" id="joinWaitText">已加入，等待房主開始遊戲…</p>
     </div>
   </div>
   <div class="err" id="lobbyErr"></div>
@@ -306,7 +318,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const VERSION='dv-3';
+const VERSION='dv-4';
+const SPEC=-9; // seat id used for spectators: no hand, no role, no private peeks
 const $=id=>document.getElementById(id);
 const QS=new URLSearchParams(location.search);
 
@@ -429,10 +442,12 @@ class Engine{
   remotes(){return this.players.filter(p=>p.ctrl==='remote'&&p.conn&&p.conn.open)}
   async broadcast(evts){
     for(const p of this.remotes())safeSend(p.conn,{type:'events',evts:evts.map(e=>this.evFor(p.id,e))});
+    for(const w of watchersOpen())safeSend(w.conn,{type:'events',evts:evts.map(e=>this.evFor(SPEC,e))});
     if(this.localPid>=0)await VIEW.enqueueEvents(evts.map(e=>this.evFor(this.localPid,e)));
   }
   sendSync(full=false,newGame=false){
     for(const p of this.remotes())safeSend(p.conn,{type:'sync',s:this.syncFor(p.id,full,newGame)});
+    if(full||!this._specSync||Date.now()-this._specSync>0){const sp=this.syncFor(SPEC,full,newGame);for(const w of watchersOpen())safeSend(w.conn,{type:'sync',s:sp})}
     if(this.localPid>=0)return VIEW.enqueueSync(this.syncFor(this.localPid,full,newGame));
   }
   allEmpty(){return this.players.every(p=>!p.hand.length)}
@@ -836,7 +851,8 @@ const VIEW={n:4,diff:'std',round:1,rounds:3,gold:[0,0,0,0],me:0,board:new Map(),
   enqueueEvents(evts){this.chain=this.chain.then(async()=>{this.busy=true;renderAll();for(const e of evts){try{await playEvent(e)}catch(err){console.error(err)}}this.busy=false;renderAll()});return this.chain},
   enqueueSync(s){this.chain=this.chain.then(()=>applySync(s));return this.chain}};
 const pn=id=>{const p=VIEW.players[id];return p?`<b style="color:${PCOL[id]}">${esc(p.name)}${id===VIEW.me?'（你）':''}</b>`:'?'};
-function log(html){const d=document.createElement('div');d.innerHTML=html;$('log').prepend(d)}
+function log(html){const d=document.createElement('div');d.innerHTML=html;$('log').prepend(d);if(NET.spectator)caption(html)}
+function caption(html){const c=$('caption');c.innerHTML=html;c.classList.remove('show');void c.offsetWidth;c.classList.add('show')}
 function toast(t,ms=1600){const e=$('toast');e.innerHTML=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),FAST.test?10:ms)}
 
 function clearScene(){
@@ -936,7 +952,7 @@ function applySync(s){
   if(mine&&!wasMine){SFX.play('turn');if(UI.sel)refreshHighlights()}
   if(!mine&&UI.sel){UI.sel=null;UI.targets=null;clearHighlights()}
   setTurnFx();renderAll();
-  if(s.newGame)showRole();
+  if(s.newGame){if(NET.spectator){toast(`第 ${s.round}／${s.rounds} 局開始`,2200);caption(`⛏ 第 ${s.round}／${s.rounds} 局開始`)}else showRole()}
 }
 function showPeekBadge(c,v){if(c.peek)return;const l=makeLabel(v==='gold'?'你看過：金':'你看過：煤',v==='gold'?'#ffc23d':'#aaa',40,.32);l.position.set(0,2*CY+.5,0);c.obj.add(l);c.peek=l}
 function setTurnFx(){const many=VIEW.players.length>6;for(const q of VIEW.players)if(q.m){const on=q.id===VIEW.turn&&!VIEW.over;
@@ -1018,8 +1034,9 @@ async function playEnd(e){
   await wait(500);
   for(const g of e.goals){const c=VIEW.board.get(K(g.x,g.y));if(c&&!c.revealed&&c.cover){c.cover.visible=false;c.goal=g.goal;if(c.peek){c.obj.remove(c.peek);c.peek=null}addGoalModel(c,true)}}
   VIEW.players.forEach((p,i)=>{const r=e.roles[i],l=makeLabel(r==='S'?'搗蛋鬼':'淘金者',r==='S'?'#ff5a4a':'#ffc23d',40);l.position.set(0,labelY(p.id)+.36,0);p.m.g.add(l)});
-  const myRole=e.roles[VIEW.me],meWin=myRole===e.winner;
-  SFX.play(meWin?'win':'lose');duck(3000);
+  const myRole=e.roles[VIEW.me],meWin=myRole===e.winner,spect=VIEW.me===SPEC;
+  SFX.play(meWin||spect?'win':'lose');duck(3000);
+  if(spect)caption(e.winner==='D'?'⛏ 淘金者勝利！':'😈 搗蛋鬼勝利！');
   // gold nuggets fly to each winner
   const src=e.winner==='D'&&e.path?W(...e.path[e.path.length-1]):W(0,0);
   for(const a of e.awards){const q=VIEW.players[a.pid];if(!q||!q.m)continue;
@@ -1030,7 +1047,7 @@ async function playEnd(e){
   VIEW.gold=e.gold;
   $('endTitle').textContent=(e.final?'最後一局 · ':`第 ${e.round}／${e.rounds} 局 · `)+(e.winner==='D'?'⛏ 淘金者勝利！':'😈 搗蛋鬼勝利！');
   $('endText').innerHTML=(e.winner==='D'?'通道成功接上金脈，礦車滿載而歸。':'牌用完了，金脈依然沉睡在黑暗裡。')+'<br>'+
-    (meWin?'<b style="color:var(--green)">你贏了！</b>':'<b style="color:var(--red)">你輸了。</b>')+(e.roles.includes('S')?'':'<br><span class="dim">這局其實沒有搗蛋鬼。</span>');
+    (spect?'':meWin?'<b style="color:var(--green)">你贏了！</b>':'<b style="color:var(--red)">你輸了。</b>')+(e.roles.includes('S')?'':'<br><span class="dim">這局其實沒有搗蛋鬼。</span>');
   const got=i=>e.awards.filter(a=>a.pid===i).map(a=>a.v);
   let html='';
   if(e.winner==='D'&&e.drawn.length)html+=`<div class="dim" style="margin-bottom:6px">${pn(e.finder)} 挖到金脈，抽出 ${e.drawn.length} 張金塊卡：${e.drawn.map(v=>`<span class="nug">🪙${v}</span>`).join(' ')}<br>由他先挑，再依順序分給其他淘金者。</div>`;
@@ -1088,15 +1105,15 @@ function renderAll(){
     if(UI.targets&&UI.targets.includes(p.id)){d.classList.add('target');if(UI.sel&&UI.sel.type==='break')d.classList.add('bad');d.onclick=()=>pickTarget(p.id)}
     P.appendChild(d)}
   const r=VIEW.role;
-  $('role').innerHTML=r?`你的身分：<b style="color:${r==='S'?'var(--red)':'var(--gold)'}">${r==='S'?'😈 搗蛋鬼':'⛏ 淘金者'}</b><span class="rdesc"><br><span style="font-size:11px;color:var(--dim)">${r==='S'?'別讓他們挖到金脈，但別被識破。':'找出金脈，小心身邊的搗蛋鬼。'}</span></span>`:'';
+  $('role').innerHTML=NET.spectator&&GAME_ON?`<b style="color:var(--blue)">👁 觀戰模式</b><span class="rdesc"><br><span style="font-size:11px;color:var(--dim)">看不到任何人的身分、手牌與地圖結果</span></span>`:r?`你的身分：<b style="color:${r==='S'?'var(--red)':'var(--gold)'}">${r==='S'?'😈 搗蛋鬼':'⛏ 淘金者'}</b><span class="rdesc"><br><span style="font-size:11px;color:var(--dim)">${r==='S'?'別讓他們挖到金脈，但別被識破。':'找出金脈，小心身邊的搗蛋鬼。'}</span></span>`:'';
   const cur=VIEW.players[VIEW.turn];
-  $('status').innerHTML=!GAME_ON?'':VIEW.over?'<b>本局結束</b>':`<span class="dim">第 ${VIEW.round}／${VIEW.rounds} 局 · ${VIEW.n} 人 · ${DIFFS[VIEW.diff].name}</span><br>輪到：${cur?pn(cur.id):''}${VIEW.turn===VIEW.me?' — 選一張牌':' 思考中…'}<br><span class="dim">牌庫剩 ${VIEW.deck} 張</span>`;
+  $('status').innerHTML=!GAME_ON?'':VIEW.over?'<b>本局結束</b>':`<span class="dim">第 ${VIEW.round}／${VIEW.rounds} 局 · ${VIEW.n} 人 · ${DIFFS[VIEW.diff].name}</span><br>輪到：${cur?pn(cur.id):''}${VIEW.turn===VIEW.me?' — 選一張牌':' 思考中…'}${NET.spectator?`<br><span class="dim">手牌：${VIEW.players.map(p=>p.n).reduce((a,b)=>a+b,0)} 張在大家手上</span>`:''}<br><span class="dim">牌庫剩 ${VIEW.deck} 張</span>`;
   const H=$('hand');H.innerHTML='';VIEW.hand.forEach(c=>H.appendChild(cardEl(c)));
-  $('handWrap').style.display=GAME_ON?'flex':'none';
+  $('handWrap').style.display=GAME_ON&&!NET.spectator?'flex':'none';$('bAuto').style.display=NET.spectator?'':'none';$('bAuto').classList.toggle('primary',SPECCAM.auto);
   $('mDeck').innerHTML=GAME_ON?`${VIEW.role?`<b style="color:${VIEW.role==='S'?'var(--red)':'var(--gold)'}">${VIEW.role==='S'?'😈搗蛋鬼':'⛏淘金者'}</b> · `:''}${VIEW.round}/${VIEW.rounds}局 · 牌庫${VIEW.deck}`:'';
   const can=myTurn();
   $('bRot').disabled=!(can&&UI.sel&&UI.sel.type==='path');$('bDiscard').disabled=!(can&&UI.sel);$('bCancel').disabled=!UI.sel;
-  $('netBadge').innerHTML=NET.mode==='solo'?'<span class="dim">單人模式</span>':NET.mode==='host'?`<span style="color:var(--green)">● 房主</span> <span class="dim">房號 ${NET.code}</span>`:NET.mode==='client'?`<span style="color:var(--blue)">● 已連線</span> <span class="dim">房號 ${NET.code}</span>`:'';
+  $('netBadge').innerHTML=NET.mode==='solo'?'<span class="dim">單人模式</span>':NET.mode==='host'?`<span style="color:var(--green)">● 房主</span> <span class="dim">房號 ${NET.code}${NET.watchers.length?` · 👁 ${NET.watchers.length}`:''}</span>`:NET.mode==='client'?`<span style="color:var(--blue)">● ${NET.spectator?'👁 觀戰中':'已連線'}</span> <span class="dim">房號 ${NET.code}</span>`:'';
   setHint();
 }
 function setHint(){
@@ -1168,7 +1185,9 @@ let ENGINE=null,GAME_ON=false,ROUNDS=3,DIFF='std',NPLAYERS=4;
 try{NPLAYERS=+localStorage.getItem('dv-n')||4;if(!ROLE_TABLE[NPLAYERS])NPLAYERS=4}catch(e){}
 try{DIFF=localStorage.getItem('dv-diff')||'std';if(!DIFFS[DIFF])DIFF='std'}catch(e){}
 try{ROUNDS=+localStorage.getItem('dv-rounds')||3}catch(e){}
-const NET={mode:null,peer:null,code:'',pass:'',hostConn:null,members:[],name:''};
+const NET={mode:null,peer:null,code:'',pass:'',hostConn:null,members:[],watchers:[],name:'',spectator:false};
+function watchersOpen(){return NET.watchers.filter(w=>w.conn&&w.conn.open)}
+function notifyStart(){if(!ENGINE)return;for(const p of ENGINE.remotes())safeSend(p.conn,{type:'start'});for(const w of watchersOpen())safeSend(w.conn,{type:'start'})}
 const PEER_PREFIX='deepvein-v2-';
 function peerOpts(){const o={debug:0};const ph=QS.get('peer');if(ph){const [h,p]=ph.split(':');Object.assign(o,{host:h,port:+p||9000,path:'/',secure:false})}return o}
 function safeSend(conn,msg){try{if(conn&&conn.open)conn.send(msg)}catch(e){console.warn(e)}}
@@ -1186,7 +1205,7 @@ $('bGo').onclick=()=>{$('mStart').classList.add('hide');startMusic();if(ENGINE&&
 function beginEngine(seats){
   if(ENGINE)ENGINE.stop();
   ENGINE=new Engine(seats,0,ROUNDS,DIFF);GAME_ON=true;$('mLobby').classList.add('hide');
-  for(const p of ENGINE.remotes())safeSend(p.conn,{type:'start'});
+  notifyStart();
   ENGINE.sendSync(true,true);
 }
 function aiFill(seats,n=NPLAYERS){const used=new Set(seats.map(s=>s.name));const pool=AINAMES.filter(n=>!used.has(n));while(seats.length<n)seats.push({name:pool.shift(),ctrl:'ai'});return seats}
@@ -1198,21 +1217,22 @@ function startOnline(){
 }
 $('bAgain').onclick=()=>{$('mEnd').classList.add('hide');
   if(!$('bAgain').dataset.final&&ENGINE){ // next round of the same match
-    ENGINE.nextRound();for(const p of ENGINE.remotes())safeSend(p.conn,{type:'start'});ENGINE.sendSync(true,true);return}
+    ENGINE.nextRound();notifyStart();ENGINE.sendSync(true,true);return}
   if(NET.mode==='solo')startSolo();
   else if(NET.mode==='host'){NET.members=NET.members.filter(m=>m.conn.open);startOnline()}};
 $('bEndClose').onclick=()=>$('mEnd').classList.add('hide');
 $('bToLobby').onclick=()=>leave();$('bLeave').onclick=()=>leave();$('bMsgOk').onclick=()=>leave();
-function leave(){try{if(NET.peer)NET.peer.destroy()}catch(e){}const u=new URL(location.href);u.searchParams.delete('room');location.href=u.toString()}
+function leave(){try{if(NET.peer)NET.peer.destroy()}catch(e){}const u=new URL(location.href);u.searchParams.delete('room');u.searchParams.delete('watch');location.href=u.toString()}
 
 /* ---------- host ---------- */
 function lobbyBroadcast(){
   const names=[NET.name,...NET.members.map(m=>m.name)];
-  for(const m of NET.members)safeSend(m.conn,{type:'lobby',names,code:NET.code,rounds:ROUNDS,diff:DIFF,n:NPLAYERS});
-  renderMembers($('hostMembers'),names);
+  const msg0={type:'lobby',names,code:NET.code,rounds:ROUNDS,diff:DIFF,n:NPLAYERS,watchers:NET.watchers.length};
+  for(const m of NET.members)safeSend(m.conn,msg0);for(const w of watchersOpen())safeSend(w.conn,msg0);
+  renderMembers($('hostMembers'),names,NET.watchers.length);
 }
-function renderMembers(el,names){
-  el.innerHTML='';for(let i=0;i<NPLAYERS;i++){const n=names[i];
+function renderMembers(el,names,watchers=0){
+  el.innerHTML=watchers?`<div class="member" style="border-style:dashed;color:var(--blue)">👁 觀戰中：${watchers} 人</div>`:'';for(let i=0;i<NPLAYERS;i++){const n=names[i];
     el.insertAdjacentHTML('beforeend',n?`<div class="member"><span class="dot" style="background:${PCOL[i]}"></span>${esc(n)}${i===0?' <span class="dim">（房主）</span>':''}</div>`:'<div class="member empty">空位（開始時由 AI 補上）</div>')}
 }
 function createRoom(){
@@ -1234,6 +1254,13 @@ function hostOnData(conn,m){
     if(m.ver!==VERSION)return reject(conn,'遊戲版本不同，請重新整理頁面。');
     if((NET.pass||'')!==(m.pass||''))return reject(conn,'密碼錯誤。');
     let name=String(m.name||'礦工').slice(0,10);
+    if(m.spectate){ // spectators never take a seat and only ever receive public information
+      if(NET.watchers.length>=30)return reject(conn,'觀戰人數已滿。');
+      NET.watchers.push({name,conn});safeSend(conn,{type:'welcome',code:NET.code,spectator:true});
+      if(GAME_ON&&ENGINE){safeSend(conn,{type:'start'});safeSend(conn,{type:'sync',s:ENGINE.syncFor(SPEC,true,false)});
+        ENGINE.broadcast([{t:'log',msg:`👁 <b>${esc(name)}</b> 進來觀戰`}]);}
+      lobbyBroadcast();SFX.play('join');renderAll();return;
+    }
     if(GAME_ON&&ENGINE){ // rejoin
       const p=ENGINE.players.find(q=>q.name===name&&q.wasRemote&&q.ctrl==='ai');
       if(!p)return reject(conn,'遊戲已經開始了，等這局結束再加入吧。');
@@ -1250,32 +1277,34 @@ function hostOnData(conn,m){
 }
 function reject(conn,reason){safeSend(conn,{type:'reject',reason});setTimeout(()=>conn.close(),400)}
 function hostOnClose(conn){
+  const wi=NET.watchers.findIndex(w=>w.conn===conn);if(wi>=0){NET.watchers.splice(wi,1);if(!GAME_ON)lobbyBroadcast();renderAll();return}
   if(GAME_ON&&ENGINE){const p=ENGINE.players.find(q=>q.conn===conn);if(p)ENGINE.dropToAI(p.id,'斷線了');}
   const i=NET.members.findIndex(m=>m.conn===conn);
   if(i>=0&&!GAME_ON){NET.members.splice(i,1);lobbyBroadcast()}
 }
 /* ---------- client ---------- */
-function joinRoom(){
+function joinRoom(spectate=false){NET.spectator=!!spectate;
   const code=$('iJoinCode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(code.length<4)return lobbyErr('請輸入房號');
   if(!netOK())return lobbyErr('無法載入連線元件，請確認網路，或使用 GitHub Pages 版本。');
-  NET.code=code;lobbyErr('連線中…');$('bJoin').disabled=true;
+  NET.code=code;lobbyErr('連線中…');$('bJoin').disabled=true;$('bWatch').disabled=true;
   const peer=new Peer(undefined,peerOpts());NET.peer=peer;
-  const fail=t=>{$('bJoin').disabled=false;lobbyErr(t)};
+  const fail=t=>{$('bJoin').disabled=false;$('bWatch').disabled=false;lobbyErr(t)};
   peer.on('error',err=>{if(err.type==='peer-unavailable')fail('找不到這個房間，確認房號是否正確、房主是否還在線上。');
     else if(GAME_ON)console.warn(err);else fail('連線失敗（'+err.type+'），請稍後再試。')});
   peer.on('open',()=>{
     const conn=peer.connect(PEER_PREFIX+code.toLowerCase(),{reliable:true});NET.hostConn=conn;
     const to=setTimeout(()=>{if(!conn.open)fail('連線逾時。可能是網路環境擋住了點對點連線，換個網路（例如手機熱點）再試。')},15000);
-    conn.on('open',()=>{clearTimeout(to);safeSend(conn,{type:'hello',name:NET.name,pass:$('iJoinPass').value,ver:VERSION})});
+    conn.on('open',()=>{clearTimeout(to);safeSend(conn,{type:'hello',name:NET.name,pass:$('iJoinPass').value,ver:VERSION,spectate:NET.spectator})});
     conn.on('data',m=>clientOnData(m));
     conn.on('close',()=>{if(NET.mode==='client')msg('與房主斷線','房主可能關閉了頁面或網路中斷。你可以回大廳重新加入（用同樣的暱稱可以接回原本的座位）。')});
   });
 }
 function clientOnData(m){
-  if(m.type==='reject'){$('bJoin').disabled=false;lobbyErr(m.reason);NET.mode=null;return}
-  if(m.type==='welcome'){NET.mode='client';if(m.name)NET.name=m.name;lobbyErr('');$('joinForm').style.display='none';$('joinRoom').style.display='';$('joinCodeShow').textContent=m.code;SFX.play('join');return}
-  if(m.type==='lobby'){if(m.n){NPLAYERS=m.n;document.querySelectorAll('#segN button').forEach(x=>x.classList.toggle('on',+x.dataset.n===m.n));$('nDesc').textContent=nDesc(m.n)}renderMembers($('joinMembers'),m.names);if(m.diff&&DIFFS[m.diff]){DIFF=m.diff;document.querySelectorAll('#segDiff button').forEach(x=>x.classList.toggle('on',x.dataset.d===m.diff));$('diffDesc').textContent=DIFFS[m.diff].desc}if(m.rounds){ROUNDS=m.rounds;document.querySelectorAll('#segRounds button').forEach(x=>x.classList.toggle('on',+x.dataset.r===m.rounds))}return}
+  if(m.type==='reject'){$('bJoin').disabled=false;$('bWatch').disabled=false;lobbyErr(m.reason);NET.mode=null;return}
+  if(m.type==='welcome'){NET.mode='client';if(m.name)NET.name=m.name;
+    if(m.spectator){NET.spectator=true;document.body.classList.add('spectate');$('joinWaitText').textContent='👁 觀戰模式：等待房主開始遊戲…（遊戲中會自動跟上進度）';}lobbyErr('');$('joinForm').style.display='none';$('joinRoom').style.display='';$('joinCodeShow').textContent=m.code;SFX.play('join');return}
+  if(m.type==='lobby'){if(m.n){NPLAYERS=m.n;document.querySelectorAll('#segN button').forEach(x=>x.classList.toggle('on',+x.dataset.n===m.n));$('nDesc').textContent=nDesc(m.n)}renderMembers($('joinMembers'),m.names,m.watchers||0);if(m.diff&&DIFFS[m.diff]){DIFF=m.diff;document.querySelectorAll('#segDiff button').forEach(x=>x.classList.toggle('on',x.dataset.d===m.diff));$('diffDesc').textContent=DIFFS[m.diff].desc}if(m.rounds){ROUNDS=m.rounds;document.querySelectorAll('#segRounds button').forEach(x=>x.classList.toggle('on',+x.dataset.r===m.rounds))}return}
   if(m.type==='start'){GAME_ON=true;$('mLobby').classList.add('hide');$('mEnd').classList.add('hide');return}
   if(m.type==='sync'){VIEW.enqueueSync(m.s);return}
   if(m.type==='events'){VIEW.enqueueEvents(m.evts);return}
@@ -1305,15 +1334,18 @@ function getName(){const n=$('iName').value.trim().slice(0,10);if(!n){lobbyErr('
   try{localStorage.setItem('dv-name',n)}catch(e){}NET.name=n;return n}
 $('bSolo').onclick=()=>{if(!getName())return;startMusic();startSolo()};
 $('bHost').onclick=()=>{if(!getName())return;startMusic();createRoom()};
-$('bJoin').onclick=()=>{if(!getName())return;startMusic();joinRoom()};
+$('bJoin').onclick=()=>{if(!getName())return;startMusic();joinRoom(false)};
+$('bWatch').onclick=()=>{if(!$('iName').value.trim())$('iName').value='觀眾';if(!getName())return;startMusic();joinRoom(true)};
 $('bStartOnline').onclick=()=>{startMusic();startOnline()};
+$('bCopyWatch').onclick=async()=>{const u=new URL(location.href);u.searchParams.set('room',NET.code);u.searchParams.set('watch','1');
+  try{await navigator.clipboard.writeText(u.toString());$('bCopyWatch').textContent='已複製 ✓'}catch(e){$('bCopyWatch').textContent=u.toString()}};
 $('bCopyLink').onclick=async()=>{const u=new URL(location.href);u.searchParams.set('room',NET.code);
   try{await navigator.clipboard.writeText(u.toString());$('bCopyLink').textContent='已複製 ✓'}catch(e){$('bCopyLink').textContent=u.toString()}};
 function showLobby(){
   try{$('iName').value=localStorage.getItem('dv-name')||''}catch(e){}
   $('iHostCode').value=randCode();setRounds([1,3,5].includes(ROUNDS)?ROUNDS:3);setDiff(DIFF);setN(NPLAYERS);
   const room=QS.get('room');
-  if(room){$('iJoinCode').value=room.toUpperCase();document.querySelector('.tabs button[data-tab="join"]').click()}
+  if(room){$('iJoinCode').value=room.toUpperCase();document.querySelector('.tabs button[data-tab="join"]').click();if(QS.get('watch')){$('bWatch').classList.add('primary');$('bJoin').classList.remove('primary')}}
   if(!netOK())$('netNote').innerHTML='⚠️ 這個環境無法使用線上連線，只能玩單人模式。線上對戰請使用 GitHub Pages 版本。';
   const h=location.hostname;if(netOK()&&!/github\.io$|^localhost$|^127\.|^192\.168\./.test(h))
     $('netNote').innerHTML='線上對戰請到 <a style="color:var(--gold)" href="https://ccl0320.github.io/deep-vein/">ccl0320.github.io/deep-vein</a>，這個頁面可能無法連線。';
@@ -1322,6 +1354,21 @@ function showLobby(){
 
 /* ---------- loop ---------- */
 const clock=new THREE.Clock();
+const SPECCAM={auto:true,t:0,tgt:null,pos:null};
+function specFit(){
+  if(!VIEW.board.size)return;let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;
+  for(const k of VIEW.board.keys()){const [x,y]=XY(k),p=board.localToWorld(W(x,y));x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);z0=Math.min(z0,p.z);z1=Math.max(z1,p.z)}
+  const side=innerWidth>760?innerWidth/Math.max(320,innerWidth-$('top').offsetWidth-$('info').offsetWidth-60):1.15; // keep the mine clear of the side panels
+  const pad=S*1.3,w=(x1-x0+pad*2)*side,d=(z1-z0+pad*2)*1.2,vf=camera.fov*Math.PI/360,hf=Math.atan(Math.tan(vf)*camera.aspect);
+  const dist=Math.max(14,(w/2)/Math.tan(hf),(d/2)/Math.tan(vf)*1.3);
+  const dir=CAM0.pos.clone().sub(CAM0.tgt).normalize();
+  SPECCAM.tgt=V3((x0+x1)/2,0,(z0+z1)/2);
+  if(innerWidth>760){const lw=$('top').offsetWidth+12,rw=$('info').offsetWidth+12,shift=(rw-lw)/2/innerWidth; // free-area centre offset (fraction of screen)
+    const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0).setY(0).normalize(),viewW=2*Math.tan(hf)*dist;SPECCAM.tgt.addScaledVector(right,shift*viewW)}
+  SPECCAM.pos=SPECCAM.tgt.clone().addScaledVector(dir,dist);
+}
+controls.addEventListener('start',()=>{if(NET.spectator&&SPECCAM.auto){SPECCAM.auto=false;renderAll()}});
+$('bAuto').onclick=()=>{SPECCAM.auto=!SPECCAM.auto;renderAll()};
 let PORTRAIT=null;
 function fitCamera(force){
   const w=innerWidth,h=innerHeight,portrait=h>w*1.1;
@@ -1351,6 +1398,8 @@ function loop(){
     if(act)p.m.ring.material.opacity=.5+Math.sin(t*4)*.4}
   for(const g of UI.ghosts)g.mesh.material.opacity=.22+Math.sin(t*4)*.12;
   startLight.intensity=15+Math.sin(t*7)*1.2+Math.sin(t*13)*.8;dust.rotation.y=t*.01;dust.position.y=Math.sin(t*.3)*.2;
+  if(NET.spectator&&SPECCAM.auto&&GAME_ON){if((SPECCAM.t+=dt)>.5){SPECCAM.t=0;specFit()}
+    if(SPECCAM.tgt){const k=Math.min(1,dt*1.2);controls.target.lerp(SPECCAM.tgt,k);camera.position.lerp(SPECCAM.pos,k)}}
   controls.update();renderer.render(scene,camera);requestAnimationFrame(loop);
 }
 
